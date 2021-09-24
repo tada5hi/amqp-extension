@@ -29,14 +29,14 @@ export type Message = {
      *
      * Default: {}
      */
-    metadata?: Record<string, any>;
+    metadata: Record<string, any>;
 
     /**
      * Store actual data.
      *
      * Default: {}
      */
-    data?: Record<string, any>;
+    data: Record<string, any>;
 };
 
 export type BuildMessageContext =

@@ -1,5 +1,5 @@
 import RabbitMQ, {Connection, Options} from "amqplib";
-import {Config, setConfig} from "../config";
+import {Config, getConfig} from "../config";
 
 const connectionMap: Map<string, Connection> = new Map<string, Connection>();
 
@@ -15,7 +15,7 @@ export function getConnections() : Map<string, Connection> {
 export async function useConnection(
     key: string | Config,
 ) : Promise<Connection> {
-    const config : Config = setConfig(key);
+    const config : Config = getConfig(key);
 
     if(connectionMap.has(config.alias)) {
         return connectionMap.get(config.alias);
