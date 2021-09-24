@@ -2,15 +2,15 @@ import {Options, Replies} from "amqplib";
 import {Config, getConfig} from "../config";
 import {MessageContext, Message} from "../message";
 import {createChannel} from "../utils";
-import {ConsumeMessageHandlers, ConsumeQueueOptions} from "./type";
+import {ConsumeHandlers, ConsumeOptions} from "./type";
 import Empty = Replies.Empty;
 
 /* istanbul ignore next */
 export async function consumeQueue(
-    options: ConsumeQueueOptions,
-    handlers: ConsumeMessageHandlers
+    options: ConsumeOptions,
+    handlers: ConsumeHandlers
 ) : Promise<void> {
-    const config : Config = getConfig(options.key);
+    const config : Config = getConfig(options.alias);
     const {channel, connection} = await createChannel(config);
 
     const queueName : string = options.name ?? '';

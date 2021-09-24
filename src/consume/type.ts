@@ -2,16 +2,19 @@ import {Options} from "amqplib";
 import {Config} from "../config";
 import {MessageContext, Message} from "../message";
 
-export type ConsumeMessageHandler = (message: Message, context: MessageContext) => Promise<void>;
-export type ConsumeMessageHandlers = Record<'$any' | string, ConsumeMessageHandler>;
+export type ConsumeHandler = (message: Message, context: MessageContext) => Promise<void>;
+export type ConsumeHandlers = Record<'$any' | string, ConsumeHandler>;
 
-export type ConsumeQueueOptions = {
+export type ConsumeOptions = {
     /**
      * Queue routing key(s).
      */
     routingKey?: string | string[],
 
-    key?: string | Config,
+    /**
+     * Config key or object.
+     */
+    alias?: string | Config,
     /**
      * Queue name
      *
@@ -26,5 +29,10 @@ export type ConsumeQueueOptions = {
      *     autoDelete: true
      * }
      */
-    options?: Options.AssertQueue
+    options?: Options.AssertQueue;
+
+    /**
+     * Default: false
+     */
+    requeueOnFailure?: boolean;
 }
