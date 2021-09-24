@@ -2,7 +2,7 @@
 [![codecov](https://codecov.io/gh/Tada5hi/amqp-extension/branch/master/graph/badge.svg?token=6YELWNP9HG)](https://codecov.io/gh/Tada5hi/amqp-extension)
 [![Master Workflow](https://github.com/Tada5hi/amqp-extension/workflows/main/badge.svg)](https://github.com/Tada5hi/amqp-extension)
 
-# AMQP Extension 🚀
+# AMQP Extension 🏰
 This repository is under heavy development at the moment and not open for public usage.
 
 
@@ -25,6 +25,12 @@ npm install amqp-extension --save
 
 ## Usage
 
+`comming soon`
+
 ## Functions
 
+`comming soon`
+
 ## Types
+
+`comming soon`
