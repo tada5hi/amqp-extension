@@ -1,30 +1,62 @@
-import {Replies} from "amqplib";
+import {Options, Replies} from "amqplib";
 import {Config, getConfig} from "../config";
+import {MessageContext, Message} from "../message";
 import {createChannel} from "../utils";
-import {ConsumeQueueCallback} from "./type";
+import {ConsumeMessageHandlers, ConsumeQueueOptions} from "./type";
 import Empty = Replies.Empty;
 
 /* istanbul ignore next */
 export async function consumeQueue(
-    cb: ConsumeQueueCallback,
-    key?: string | Config,
-    routingKey: string | string[] = []
-) {
-    const config : Config = getConfig(key);
+    options: ConsumeQueueOptions,
+    handlers: ConsumeMessageHandlers
+) : Promise<void> {
+    const config : Config = getConfig(options.key);
     const {channel, connection} = await createChannel(config);
 
-    const assertionQueue = await channel.assertQueue('', {
+    const queueName : string = options.name ?? '';
+    const queueOptions : Options.AssertQueue = {
         durable: false,
-        autoDelete: true
-    });
+        autoDelete: true,
+        ...(options.options ?? {})
+    }
 
-    const routingKeys : string[] = Array.isArray(routingKey) ? routingKey : [routingKey];
+    const assertionQueue = await channel.assertQueue(queueName, queueOptions);
 
-    const promises : Promise<Replies.Empty>[] = routingKeys.map(routKey => {
-        return channel.bindQueue(assertionQueue.queue, config.exchange.name, routKey) as unknown as Promise<Empty>;
-    });
+    if(typeof options.routingKey !== 'undefined') {
+        const routingKeys: string[] = Array.isArray(options.routingKey) ? options.routingKey : [options.routingKey];
 
-    await Promise.all(promises);
+        const promises: Promise<Replies.Empty>[] = routingKeys.map(routKey => {
+            return channel.bindQueue(assertionQueue.queue, config.exchange.name, routKey) as unknown as Promise<Empty>;
+        });
 
-    await channel.consume(assertionQueue.queue, (msg => cb(msg, {channel: channel, connection: connection})));
+        await Promise.all(promises);
+    }
+
+    await channel.consume(assertionQueue.queue, ((async (message) => {
+        if(!message) {
+            return;
+        }
+
+        const content : Message = JSON.parse(message.content.toString('utf-8'));
+        const handler = handlers[content.type] ?? handlers.$any;
+
+        const context : MessageContext = {
+            channel: channel,
+            connection: connection,
+            messageFields: message.fields,
+            messageProperties: message.properties
+        }
+
+        if(typeof handler === 'undefined') {
+            channel.ack(message);
+        }
+
+        try {
+            await handler(content, context);
+            await channel.ack(message);
+        } catch (e) {
+            const requeueOnFailure : boolean = config.consume?.requeueOnFailure ?? false;
+            await channel.reject(message, requeueOnFailure);
+        }
+    })));
 }

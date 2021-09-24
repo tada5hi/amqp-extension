@@ -12,5 +12,11 @@ export type Config = {
     },
     publish?: {
         options?: Options.Publish
+    },
+    consume?: {
+        /**
+         * Default: false
+         */
+        requeueOnFailure?: boolean
     }
 };

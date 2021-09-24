@@ -1,7 +1,7 @@
 {
     "name": "amqp-extension",
-    "version": "0.0.2",
-    "description": "",
+    "version": "0.0.3",
+    "description": "An amqp extension with functions and utility functions to consume and publish queue messages.",
     "main": "./dist/index.js",
     "scripts": {
         "build": "rm -rf ./dist && tsc",
@@ -14,6 +14,14 @@
         "url": "https:/github.com/tada5hi"
     },
     "license": "MIT",
+    "keywords": [
+        "amqp",
+        "amqplib",
+        "consumeQueue",
+        "publishMessage",
+        "typescript",
+        "amqplib"
+    ],
     "dependencies": {
         "amqplib": "^0.8.0",
         "uuid": "^8.3.2"
