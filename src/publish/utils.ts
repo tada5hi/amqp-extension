@@ -9,7 +9,7 @@ export async function publishMessage(
     message: Message,
     options?: PublishOptions
 ) {
-    let {options: MessageOptions, ...messagePayload} = message;
+    let {options: messageOptions, ...messagePayload} = message;
 
     const buffer: Buffer = Buffer.from(JSON.stringify(messagePayload));
 
@@ -19,8 +19,9 @@ export async function publishMessage(
 
     const publishOptions: Options.Publish = {
         ...(config.publish?.options ?? {}),
-        ...(MessageOptions.publish ?? {})
+        ...(messageOptions.publish ?? {}),
+        ...(options.options ?? {})
     }
 
-    channel.publish(config.exchange.name, MessageOptions.routingKey, buffer, publishOptions);
+    channel.publish(config.exchange.name, messageOptions.routingKey, buffer, publishOptions);
 }

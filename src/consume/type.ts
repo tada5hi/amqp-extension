@@ -16,20 +16,17 @@ export type ConsumeOptions = {
      */
     alias?: string | Config,
     /**
-     * Queue name
+     * Queue name.
      *
      * Default: ''
      */
     name?: string,
     /**
-     * Queue options
+     * Amqplib consume options.
      *
-     * Default: {
-     *     durable: false,
-     *     autoDelete: true
-     * }
+     * Default: { }
      */
-    options?: Options.AssertQueue;
+    options?: Options.Consume;
 
     /**
      * Default: false

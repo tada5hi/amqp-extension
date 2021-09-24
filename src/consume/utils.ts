@@ -14,13 +14,10 @@ export async function consumeQueue(
     const {channel, connection} = await createChannel(config);
 
     const queueName : string = options.name ?? '';
-    const queueOptions : Options.AssertQueue = {
+    const assertionQueue = await channel.assertQueue(queueName, {
         durable: false,
-        autoDelete: true,
-        ...(options.options ?? {})
-    }
-
-    const assertionQueue = await channel.assertQueue(queueName, queueOptions);
+        autoDelete: true
+    });
 
     if(typeof options.routingKey !== 'undefined') {
         const routingKeys: string[] = Array.isArray(options.routingKey) ? options.routingKey : [options.routingKey];
@@ -31,6 +28,11 @@ export async function consumeQueue(
 
         await Promise.all(promises);
     }
+
+    const consumeOptions : Options.Consume = {
+        ...(config.consume?.options ?? {}),
+        ...(options.options ?? {})
+    };
 
     await channel.consume(assertionQueue.queue, ((async (message) => {
         if(!message) {
@@ -58,5 +60,5 @@ export async function consumeQueue(
             const requeueOnFailure : boolean = config.consume?.requeueOnFailure ?? false;
             await channel.reject(message, requeueOnFailure);
         }
-    })));
+    })), consumeOptions);
 }

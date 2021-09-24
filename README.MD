@@ -357,12 +357,9 @@ export type ConsumeOptions = {
     /**
      * Amqplib consume options.
      *
-     * Default: {
-     *     durable: false,
-     *     autoDelete: true
-     * }
+     * Default: {}
      */
-    options?: Options.AssertQueue
+    options?: Options.Consume
 }
 ```
 

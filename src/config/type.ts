@@ -1,4 +1,6 @@
 import {Options} from "amqplib";
+import {ConsumeOptions} from "../consume";
+import {PublishOptions} from "../publish";
 
 export type ExchangeType = 'fanout' | 'direct' | 'topic' | 'match' | string;
 
@@ -10,13 +12,6 @@ export type Config = {
         type: ExchangeType,
         options?: Options.AssertExchange
     },
-    publish?: {
-        options?: Options.Publish
-    },
-    consume?: {
-        /**
-         * Default: false
-         */
-        requeueOnFailure?: boolean
-    }
+    publish?: PublishOptions,
+    consume?: ConsumeOptions
 };
