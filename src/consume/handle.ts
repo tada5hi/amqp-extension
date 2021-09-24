@@ -1,11 +1,11 @@
 import {ConsumeMessage} from "amqplib";
-import {Message, MessageContext} from "../message";
-import {ConsumeMessageHandlers} from "./type";
+import {Message} from "../message";
+import {ConsumeMessageHandlers, ConsumeMessageContext} from "./type";
 
 /* istanbul ignore next */
 export async function handleConsumeMessage(
     message: ConsumeMessage,
-    context: MessageContext,
+    context: ConsumeMessageContext,
     handlers: ConsumeMessageHandlers = {}
 ) {
     const content : Message = JSON.parse(message.content.toString('utf-8'));

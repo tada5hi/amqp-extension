@@ -1,4 +1,4 @@
-import {Channel, Connection, MessageFields, MessageProperties, Options} from "amqplib";
+import {Options} from "amqplib";
 
 export interface MessageOptions {
     routingKey?: string;
@@ -37,13 +37,6 @@ export type Message = {
      * Default: {}
      */
     data?: Record<string, any>;
-};
-
-export type MessageContext = {
-    channel: Channel,
-    connection: Connection,
-    messageFields?: MessageFields,
-    messageProperties?: MessageProperties
 };
 
 export type BuildMessageContext =
