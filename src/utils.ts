@@ -14,7 +14,7 @@ export async function createChannel(key: string | Config) : Promise<{
 
     const exchangeOptions : Options.AssertExchange = {
         durable: true,
-        ...(config.exchange ?? {})
+        ...(config.exchange?.options ?? {})
     };
 
     await channel.assertExchange(config.exchange.name, config.exchange.type, exchangeOptions);
