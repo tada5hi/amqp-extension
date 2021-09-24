@@ -4,7 +4,7 @@
 
 # AMQP Extension 🏰
 
-This is a library on top of the famous [amqplib](https://www.npmjs.com/package/amqplib) library and defines a [message format](#message-types) for queue message through a message broker across multiple standalone services.
+This is a library on top of the famous [amqplib](https://www.npmjs.com/package/amqplib) library and defines a [message format](#message-types) for queue messages through a message broker across multiple standalone services.
 All utility functions support the usage of multiple registered connections.
 
 **Table of Contents**
