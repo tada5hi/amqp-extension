@@ -15,12 +15,14 @@
     },
     "license": "MIT",
     "dependencies": {
-        "amqplib": "^0.8.0"
+        "amqplib": "^0.8.0",
+        "uuid": "^8.3.2"
     },
     "devDependencies": {
         "@types/amqplib": "^0.8.2",
         "@types/jest": "^27.0.2",
         "@types/node": "^16.0.1",
+        "@types/uuid": "^8.3.1",
         "coveralls": "^3.1.0",
         "cross-env": "^7.0.3",
         "jest": "^27.0.5",
