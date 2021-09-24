@@ -5,6 +5,7 @@ import {Message} from "../message";
 import {createChannel} from "../utils";
 import {PublishOptions} from "./type";
 
+/* istanbul ignore next */
 export async function publishMessage(
     message: Message,
     options?: PublishOptions
