@@ -22,6 +22,10 @@
         "typescript",
         "amqplib"
     ],
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/Tada5hi/amqp-extension.git"
+    },
     "dependencies": {
         "amqplib": "^0.8.0",
         "uuid": "^8.3.2"

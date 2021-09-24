@@ -13,7 +13,14 @@ This is a library on top of the famous `amqplib` library and defines a message f
   - [Publish](#publish)
   - [Consume](#consume)
 - [Functions](#functions)
+  - [useConnection](#useconnection)
+  - [publishMessage](#publishmessage)
+  - [consumeQueue](#consumequeue)
 - [Types](#types)
+  - [Config](#config-types)
+  - [Consume](#consume-types)
+  - [ConsumeMessage](#consume-message-types)
+  - [Message](#message-types)
 
 
 
@@ -27,7 +34,7 @@ npm install amqp-extension --save
 
 ### Publish
 
-To publish a queue message according the [Message Scheme](#message), use the `buildMessage` helper function
+To publish a queue message according the [Message Scheme](#message-types), use the `buildMessage` helper function
 to build a message and the `publishMessage` function to submit it to the message broker.
 
 ```typescript
@@ -140,7 +147,7 @@ const connection = useConnection({
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `key` | `string` or `Config` | Config or alias of config. [more](#config) |
+| `key` | `string` or `Config` | Config or alias of config. [more](#config-types) |
 
 #### Returns
 
@@ -188,7 +195,7 @@ console.log(message);
 | Name | Type | Description |
 | :------ | :------ | :------ |
 | `message` | `Message` | Constructed message object.|
-| `key` | `string` or `Config` | Config or alias of config. [more](#config) |
+| `key` | `string` or `Config` | Config or alias of config. [more](#config-types) |
 
 #### Returns
 
@@ -253,7 +260,7 @@ The function does not return a value.
 
 ## Types
 
-### Config
+### Config Types
 
 ```typescript
 import {Options} from "amqplib";
@@ -280,7 +287,7 @@ export type Config = {
 };
 ```
 
-### Consume
+### Consume Types
 
 
 ```typescript
@@ -317,10 +324,22 @@ export type ConsumeQueueOptions = {
      */
     options?: Options.AssertQueue
 }
-
 ```
 
-### Message
+### Consume Message Types
+
+```typescript
+import {Channel, Connection, MessageFields, MessageProperties} from "amqplib";
+
+export type ConsumeMessageContext = {
+    channel: Channel,
+    connection: Connection,
+    messageFields?: MessageFields,
+    messageProperties?: MessageProperties
+};
+```
+
+### Message Types
 
 ```typescript
 export interface MessageOptions {
@@ -365,18 +384,5 @@ export type Message = {
      * Default: {}
      */
     data: Record<string, any>;
-};
-```
-
-### Consume Message
-
-```typescript
-import {Channel, Connection, MessageFields, MessageProperties} from "amqplib";
-
-export type ConsumeMessageContext = {
-    channel: Channel,
-    connection: Connection,
-    messageFields?: MessageFields,
-    messageProperties?: MessageProperties
 };
 ```
