@@ -14,6 +14,7 @@ export async function consumeQueue(
     const {channel, connection} = await createChannel(config);
 
     const queueName : string = options.name ?? '';
+
     const assertionQueue = await channel.assertQueue(queueName, {
         durable: false,
         autoDelete: true
