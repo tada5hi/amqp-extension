@@ -3,7 +3,6 @@ import {Config, getConfig} from "../config";
 import {MessageContext, Message} from "../message";
 import {createChannel} from "../utils";
 import {ConsumeHandlers, ConsumeOptions} from "./type";
-import Empty = Replies.Empty;
 
 /* istanbul ignore next */
 export async function consumeQueue(
@@ -24,7 +23,7 @@ export async function consumeQueue(
         const routingKeys: string[] = Array.isArray(options.routingKey) ? options.routingKey : [options.routingKey];
 
         const promises: Promise<Replies.Empty>[] = routingKeys.map(routKey => {
-            return channel.bindQueue(assertionQueue.queue, config.exchange.name, routKey) as unknown as Promise<Empty>;
+            return channel.bindQueue(assertionQueue.queue, config.exchange.name, routKey) as unknown as Promise<Replies.Empty>;
         });
 
         await Promise.all(promises);
@@ -56,10 +55,10 @@ export async function consumeQueue(
 
         try {
             await handler(content, context);
-            await channel.ack(message);
+            channel.ack(message);
         } catch (e) {
             const requeueOnFailure : boolean = config.consume?.requeueOnFailure ?? false;
-            await channel.reject(message, requeueOnFailure);
+            channel.reject(message, requeueOnFailure);
         }
     })), consumeOptions);
 }

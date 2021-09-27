@@ -14,6 +14,7 @@ All utility functions support the usage of multiple registered connections.
   - [Publish](#publish)
   - [Consume](#consume)
 - [Functions](#functions)
+  - [setConfig](#setconfig)
   - [useConnection](#useconnection)
   - [publishMessage](#publishmessage)
   - [consumeQueue](#consumequeue)
@@ -44,11 +45,11 @@ import {
     Message,
     useConnection,
     publishMessage,
-    useConnection
+    setConfig
 } from "amqp-extension";
 
 // This will set the default connection :)
-useConnection({
+setConfig({
     connection: 'amqp://<user>:<password>@<host>',
     exchange: {
         name: '<name>',
@@ -82,12 +83,12 @@ import {
     ConsumeOptions,
     Message,
     MessageContext,
-    useConnection,
-    publishMessage
+    publishMessage,
+    setConfig
 } from "amqp-extension";
 
 // This will set the default connection :)
-useConnection({
+setConfig({
     connection: 'amqp://<user>:<password>@<host>',
     exchange: {
         name: '<name>',
@@ -121,13 +122,13 @@ import {
     ConsumeOptions,
     Message,
     MessageContext,
-    useConnection,
-    publishMessage
+    publishMessage,
+    PublishOptions,
+    setConfig
 } from "amqp-extension";
-import {PublishOptions} from "./type";
 
 // This will set the default connection :)
-useConnection({
+setConfig({
     connection: 'amqp://<user>:<password>@<host>',
     exchange: {
         name: '<name>',
@@ -162,29 +163,126 @@ const publishOptions: PublishOptions = {
 
 ## Functions
 
+### setConfig
+
+▸ `function` **setConfig**(`key?: string | Config`, `value?: Config`): `Config`
+
+Register a connection as `default` alias or specify an `<alias>` as config property.
+
+#### Example
+**`Simple`**
+
+Define the default connection config.
+
+```typescript
+import {setConfig, useConnection} from "amqp-extension";
+
+(async () => {
+    setConfig({
+        connection: 'amqp://<user>:<password>@<host>',
+        exchange: {
+            name: '<name>',
+            type: 'topic'
+        }
+    });
+
+    const connection = await useConnection();
+})();
+
+```
+
+Define a non default connection.
+
+```typescript
+import {setConfig, useConnection} from "amqp-extension";
+
+(async () => {
+    setConfig({
+        alias: '<alias>',
+        connection: 'amqp://<user>:<password>@<host>',
+        exchange: {
+            name: '<name>',
+            type: 'topic'
+        }
+    });
+
+    setConfig('foo', {
+        connection: 'amqp://<user>:<password>@<host>',
+        exchange: {
+            name: '<name>',
+            type: 'topic'
+        }
+    });
+
+    const connection = await useConnection('<alias>');
+    const fooConnection = await useConnection('foo');
+})();
+
+```
+
+
+#### Type parameters
+
+| Name | Description |
+| :------ | :------ |
+
+
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `key` | `string` or `Config` | Config object or alias of config. [more](#config-types) |
+| `value` | `Config` | Config object. [more](#config-types) |
+
+#### Returns
+
+`Config`
+
+The function returns the Config object.
+
 ### useConnection
 
 ▸ `function` **useConnection**(`key?: string | Config`): `Promise<Connection>`
 
 Either register a connection as `default` alias or specify an `alias` as config property.
 If you have registered a connection you can receive the connection by specifying no arguments or provide an alias name if specified.
+
+
 #### Example
 **`Simple`**
+
+Receive underlying driver connection.
 
 ```typescript
 import {useConnection} from "amqp-extension";
 
 (async () => {
-
+    const connection = await useConnection();
 })();
-const connection = useConnection({
-    alias: '<alias>',
-    connection: 'amqp://<user>:<password>@<host>',
-    exchange: {
-        name: '<name>',
-        type: 'topic'
-    }
-});
+
+```
+
+**`Advanced`**
+
+Use a none `default` connection.
+
+```typescript
+import {setConfig, useConnection} from "amqp-extension";
+
+(async () => {
+    setConfig({
+        alias: '<alias>',
+        connection: 'amqp://<user>:<password>@<host>',
+        exchange: {
+            name: '<name>',
+            type: 'topic'
+        }
+    });
+
+    const connection = await useConnection('<alias>');
+})();
+
 ```
 
 #### Type parameters
