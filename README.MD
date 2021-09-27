@@ -136,7 +136,7 @@ setConfig({
     }
 });
 
-useConnection({
+setConfig({
     alias: 'foo',
     connection: 'amqp://<user>:<password>@<host>',
     exchange: {
