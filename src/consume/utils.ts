@@ -49,15 +49,16 @@ export async function consumeQueue(
             messageProperties: message.properties
         }
 
+        const requeueOnFailure : boolean = config.consume?.requeueOnFailure ?? false;
+
         if(typeof handler === 'undefined') {
-            channel.ack(message);
+            return channel.reject(message, requeueOnFailure);
         }
 
         try {
             await handler(content, context);
             channel.ack(message);
         } catch (e) {
-            const requeueOnFailure : boolean = config.consume?.requeueOnFailure ?? false;
             channel.reject(message, requeueOnFailure);
         }
     })), consumeOptions);

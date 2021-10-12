@@ -1,8 +1,9 @@
 {
     "name": "amqp-extension",
-    "version": "0.0.6",
+    "version": "0.0.7",
     "description": "An amqp extension with functions and utility functions to consume and publish queue messages.",
     "main": "./dist/index.js",
+    "typings": "dist/index.d.ts",
     "scripts": {
         "build": "rm -rf ./dist && tsc",
         "test": "cross-env NODE_ENV=test jest --config ./test/jest.config.js",
