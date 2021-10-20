@@ -1,9 +1,12 @@
 import {Options} from "amqplib";
 import {Config} from "../config";
-import {MessageContext, Message} from "../message";
+import {Message, MessageContext} from "../message";
+import {ConsumeHandlerAnyKey} from "./constants";
 
 export type ConsumeHandler = (message: Message, context: MessageContext) => Promise<void>;
-export type ConsumeHandlers = Record<'$any' | string, ConsumeHandler>;
+export type ConsumeHandlerAnyKeyType = typeof ConsumeHandlerAnyKey;
+
+export type ConsumeHandlers = Record<ConsumeHandlerAnyKeyType | string, ConsumeHandler>;
 
 export type ConsumeOptions = {
     /**

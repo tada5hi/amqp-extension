@@ -3,6 +3,7 @@ import {Config, getConfig} from "../config";
 import {MessageContext, Message} from "../message";
 import {createChannel} from "../utils";
 import {ConsumeHandlers, ConsumeOptions} from "./type";
+import {ConsumeHandlerAnyKey} from "./constants";
 
 /* istanbul ignore next */
 export async function consumeQueue(
@@ -40,7 +41,7 @@ export async function consumeQueue(
         }
 
         const content : Message = JSON.parse(message.content.toString('utf-8'));
-        const handler = handlers[content.type] ?? handlers.$any;
+        const handler = handlers[content.type] ?? handlers[ConsumeHandlerAnyKey];
 
         const context : MessageContext = {
             channel: channel,
