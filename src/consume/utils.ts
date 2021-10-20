@@ -3,7 +3,7 @@ import {Config, getConfig} from "../config";
 import {MessageContext, Message} from "../message";
 import {createChannel} from "../utils";
 import {ConsumeHandlers, ConsumeOptions} from "./type";
-import {ConsumeHandlerAnyKey} from "./constants";
+import {ConsumeHandlerAnyKey} from "./static";
 
 /* istanbul ignore next */
 export async function consumeQueue(
