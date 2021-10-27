@@ -11,8 +11,8 @@
     },
     "author": {
         "name": "Peter Placzek",
-        "email": "tadashi@animesu.net",
-        "url": "https:/github.com/tada5hi"
+        "email": "contact@tada5hi.net",
+        "url": "https://github.com/tada5hi"
     },
     "license": "MIT",
     "keywords": [
@@ -27,6 +27,10 @@
         "type": "git",
         "url": "git+https://github.com/Tada5hi/amqp-extension.git"
     },
+    "bugs": {
+        "url": "https://github.com/Tada5hi/amqp-extension/issues"
+    },
+    "homepage": "https://github.com/Tada5hi/amqp-extension#readme",
     "dependencies": {
         "amqplib": "^0.8.0",
         "uuid": "^8.3.2"
