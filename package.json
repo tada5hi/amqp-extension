@@ -7,7 +7,9 @@
     "scripts": {
         "build": "rm -rf ./dist && tsc",
         "test": "cross-env NODE_ENV=test jest --config ./test/jest.config.js",
-        "test:coverage": "cross-env NODE_ENV=test jest --config ./test/jest.config.js --coverage"
+        "test:coverage": "cross-env NODE_ENV=test jest --config ./test/jest.config.js --coverage",
+        "lint": "eslint --ext .js,.vue,.ts ./src",
+        "lint:fix": "npm run lint -- --fix"
     },
     "author": {
         "name": "Peter Placzek",

@@ -1,42 +1,41 @@
-import {Options, Replies} from "amqplib";
-import {Config, getConfig} from "../config";
-import {MessageContext, Message} from "../message";
-import {createChannel} from "../utils";
-import {ConsumeHandlers, ConsumeOptions} from "./type";
-import {ConsumeHandlerAnyKey} from "./static";
+import { Options, Replies } from 'amqplib';
+import { Config, getConfig } from '../config';
+import { Message, MessageContext } from '../message';
+import { createChannel } from '../utils';
+import { ConsumeHandlers, ConsumeOptions } from './type';
+import { ConsumeHandlerAnyKey } from './static';
 
 /* istanbul ignore next */
 export async function consumeQueue(
     options: ConsumeOptions,
-    handlers: ConsumeHandlers
+    handlers: ConsumeHandlers,
 ) : Promise<void> {
     const config : Config = getConfig(options.alias);
-    const {channel, connection} = await createChannel(config);
+    const { channel, connection } = await createChannel(config);
 
     const queueName : string = options.name ?? '';
 
     const assertionQueue = await channel.assertQueue(queueName, {
         durable: false,
-        autoDelete: true
+        autoDelete: true,
     });
 
-    if(typeof options.routingKey !== 'undefined') {
+    if (typeof options.routingKey !== 'undefined') {
         const routingKeys: string[] = Array.isArray(options.routingKey) ? options.routingKey : [options.routingKey];
 
-        const promises: Promise<Replies.Empty>[] = routingKeys.map(routKey => {
-            return channel.bindQueue(assertionQueue.queue, config.exchange.name, routKey) as unknown as Promise<Replies.Empty>;
-        });
+        const promises: Promise<Replies.Empty>[] = routingKeys
+            .map((routKey) => channel.bindQueue(assertionQueue.queue, config.exchange.name, routKey) as unknown as Promise<Replies.Empty>);
 
         await Promise.all(promises);
     }
 
     const consumeOptions : Options.Consume = {
         ...(config.consume?.options ?? {}),
-        ...(options.options ?? {})
+        ...(options.options ?? {}),
     };
 
     await channel.consume(assertionQueue.queue, ((async (message) => {
-        if(!message) {
+        if (!message) {
             return;
         }
 
@@ -44,16 +43,17 @@ export async function consumeQueue(
         const handler = handlers[content.type] ?? handlers[ConsumeHandlerAnyKey];
 
         const context : MessageContext = {
-            channel: channel,
-            connection: connection,
+            channel,
+            connection,
             messageFields: message.fields,
-            messageProperties: message.properties
-        }
+            messageProperties: message.properties,
+        };
 
         const requeueOnFailure : boolean = config.consume?.requeueOnFailure ?? false;
 
-        if(typeof handler === 'undefined') {
-            return channel.reject(message, requeueOnFailure);
+        if (typeof handler === 'undefined') {
+            channel.reject(message, requeueOnFailure);
+            return;
         }
 
         try {

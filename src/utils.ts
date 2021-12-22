@@ -1,6 +1,6 @@
-import {Channel, Connection, Options} from "amqplib";
-import {Config, getConfig} from "./config";
-import {useConnection} from "./connection";
+import { Channel, Connection, Options } from 'amqplib';
+import { Config, getConfig } from './config';
+import { useConnection } from './connection';
 
 /* istanbul ignore next */
 export async function createChannel(key: string | Config) : Promise<{
@@ -14,13 +14,13 @@ export async function createChannel(key: string | Config) : Promise<{
 
     const exchangeOptions : Options.AssertExchange = {
         durable: true,
-        ...(config.exchange?.options ?? {})
+        ...(config.exchange?.options ?? {}),
     };
 
     await channel.assertExchange(config.exchange.name, config.exchange.type, exchangeOptions);
 
     return {
-        channel: channel,
-        connection: connection
+        channel,
+        connection,
     };
 }

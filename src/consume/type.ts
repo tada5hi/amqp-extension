@@ -1,7 +1,7 @@
-import {Options} from "amqplib";
-import {Config} from "../config";
-import {Message, MessageContext} from "../message";
-import {ConsumeHandlerAnyKey} from "./static";
+import { Options } from 'amqplib';
+import { Config } from '../config';
+import { Message, MessageContext } from '../message';
+import { ConsumeHandlerAnyKey } from './static';
 
 export type ConsumeHandler = (message: Message, context: MessageContext) => Promise<void>;
 export type ConsumeHandlerAnyKeyType = typeof ConsumeHandlerAnyKey;
@@ -35,4 +35,4 @@ export type ConsumeOptions = {
      * Default: false
      */
     requeueOnFailure?: boolean;
-}
+};

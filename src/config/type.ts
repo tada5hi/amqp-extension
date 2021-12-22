@@ -1,6 +1,6 @@
-import {Options} from "amqplib";
-import {ConsumeOptions} from "../consume";
-import {PublishOptions} from "../publish";
+import { Options } from 'amqplib';
+import { ConsumeOptions } from '../consume';
+import { PublishOptions } from '../publish';
 
 export type ExchangeType = 'fanout' | 'direct' | 'topic' | 'match' | string;
 

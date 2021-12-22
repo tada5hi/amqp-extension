@@ -1,5 +1,5 @@
-import {Options} from "amqplib";
-import {Config} from "../config";
+import { Options } from 'amqplib';
+import { Config } from '../config';
 
 export type PublishOptions = {
     /**
@@ -11,4 +11,4 @@ export type PublishOptions = {
      * Amqplib publish options.
      */
     options?: Options.Publish;
-}
+};

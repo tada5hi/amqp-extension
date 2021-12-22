@@ -1,4 +1,6 @@
-import {Channel, Connection, MessageFields, MessageProperties, Options} from "amqplib";
+import {
+    Channel, Connection, MessageFields, MessageProperties, Options,
+} from 'amqplib';
 
 export interface MessageOptions {
     /**

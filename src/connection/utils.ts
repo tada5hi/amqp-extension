@@ -1,5 +1,5 @@
-import RabbitMQ, {Connection, Options} from "amqplib";
-import {Config, getConfig} from "../config";
+import RabbitMQ, { Connection, Options } from 'amqplib';
+import { Config, getConfig } from '../config';
 
 const connectionMap: Map<string, Connection> = new Map<string, Connection>();
 
@@ -17,7 +17,7 @@ export async function useConnection(
 ) : Promise<Connection> {
     const config : Config = getConfig(key);
 
-    if(connectionMap.has(config.alias)) {
+    if (connectionMap.has(config.alias)) {
         return connectionMap.get(config.alias);
     }
 
@@ -30,5 +30,5 @@ export async function useConnection(
 
 /* istanbul ignore next */
 export async function createConnection(config: Options.Connect | string) {
-    return await RabbitMQ.connect(config);
+    return RabbitMQ.connect(config);
 }
