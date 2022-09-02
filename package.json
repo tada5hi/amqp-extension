@@ -39,7 +39,7 @@
         "uuid": "^8.3.2"
     },
     "devDependencies": {
-        "@tada5hi/eslint-config-typescript": "^1.0.5",
+        "@tada5hi/eslint-config-typescript": "^1.0.6",
         "@types/amqplib": "^0.8.2",
         "@types/jest": "^27.4.1",
         "@types/node": "^18.7.9",
