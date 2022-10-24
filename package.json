@@ -42,7 +42,7 @@
         "@tada5hi/eslint-config-typescript": "^1.0.7",
         "@types/amqplib": "^0.8.2",
         "@types/jest": "^27.4.1",
-        "@types/node": "^18.7.23",
+        "@types/node": "^18.11.4",
         "@types/uuid": "^8.3.4",
         "codecov": "^3.8.3",
         "coveralls": "^3.1.0",
