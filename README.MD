@@ -1,8 +1,10 @@
+# AMQP Extension 🏰
+
 [![npm version](https://badge.fury.io/js/amqp-extension.svg)](https://badge.fury.io/js/amqp-extension)
 [![codecov](https://codecov.io/gh/Tada5hi/amqp-extension/branch/master/graph/badge.svg?token=6YELWNP9HG)](https://codecov.io/gh/Tada5hi/amqp-extension)
 [![Master Workflow](https://github.com/Tada5hi/amqp-extension/workflows/main/badge.svg)](https://github.com/Tada5hi/amqp-extension)
-
-# AMQP Extension 🏰
+[![Known Vulnerabilities](https://snyk.io/test/github/Tada5hi/amqp-extension/badge.svg?targetFile=package.json)](https://snyk.io/test/github/Tada5hi/amqp-extension?targetFile=package.json)
+[![semantic-release: angular](https://img.shields.io/badge/semantic--release-angular-e10079?logo=semantic-release)](https://github.com/semantic-release/semantic-release)
 
 This is a library on top of the famous [amqplib](https://www.npmjs.com/package/amqplib) library and defines a [message format](#message-types) for queue messages through a message broker across multiple standalone services.
 All utility functions support the usage of multiple registered connections.
@@ -23,7 +25,7 @@ All utility functions support the usage of multiple registered connections.
   - [Consume](#consume-types)
   - [Message](#message-types)
   - [Publish](#publish-types)
-
+- [License](#license)
 
 
 ## Installation
@@ -530,3 +532,9 @@ export type PublishOptions = {
 }
 
 ```
+
+## License
+
+Made with 💚
+
+Published under [MIT License](./LICENSE).
