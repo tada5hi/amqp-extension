@@ -1,5 +1,12 @@
+/*
+ * Copyright (c) 2022.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
 import {
-    Channel, Connection, ConsumeMessage, Options,
+    Channel, Connection, ConsumeMessage,
 } from 'amqplib';
 import { RPCState } from '../constants';
 import { RPC } from '../shared';
@@ -97,10 +104,13 @@ export class RPCClient extends RPC {
     async request<T>(data: T) {
         const correlationId = `${this.requestId++}`;
 
+        /*
         const options : Options.Publish = {
             replyTo: this.queueName,
             correlationId,
         };
+
+         */
 
         let resolve : RPCClientRequestResolve<T>;
         let reject : RPCClientRequestReject;

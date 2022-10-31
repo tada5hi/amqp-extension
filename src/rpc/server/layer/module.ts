@@ -1,6 +1,15 @@
+/*
+ * Copyright (c) 2022.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
 import {
     Key, ParseOptions, TokensToRegexpOptions, pathToRegexp,
 } from 'path-to-regexp';
+import { merge } from 'smob';
+import { RPCServerRequestInterface, RPCServerResponseInterface } from '../type';
 
 function decodeParam(val: unknown) {
     if (typeof val !== 'string' || val.length === 0) {
@@ -11,13 +20,15 @@ function decodeParam(val: unknown) {
 }
 
 export class RPCServerLayer {
-    protected path : string | undefined;
+    readonly '@instanceof' = Symbol.for('RPCServerLayer');
+
+    public path : string | undefined;
 
     protected pathRaw : string;
 
     protected params: Record<string, any> | undefined;
 
-    protected handle : CallableFunction;
+    protected fn : CallableFunction;
 
     protected regexp : RegExp;
 
@@ -25,42 +36,79 @@ export class RPCServerLayer {
 
     protected keys : Key[] = [];
 
+    // --------------------------------------------------
+
     constructor(
         path: string,
         options: TokensToRegexpOptions & ParseOptions,
         fn: CallableFunction,
     ) {
         this.pathRaw = path;
-        this.handle = fn;
+        this.fn = fn;
         this.regexpOptions = options;
         this.regexp = pathToRegexp(path, this.keys, options);
     }
 
-    handleError(error, req, res, next) : void {
-        if (this.handle.length !== 4) {
-            next(error);
+    // --------------------------------------------------
+
+    isError() {
+        return this.fn.length === 4;
+    }
+
+    // --------------------------------------------------
+
+    dispatch(
+        req: RPCServerRequestInterface,
+        res: RPCServerResponseInterface,
+        next: CallableFunction
+    ) : void;
+
+    dispatch(
+        req: RPCServerRequestInterface,
+        res: RPCServerResponseInterface,
+        next: CallableFunction,
+        err: Error,
+    ) : void;
+
+    dispatch(
+        req: RPCServerRequestInterface,
+        res: RPCServerResponseInterface,
+        next: CallableFunction,
+        err?: Error,
+    ) : void {
+        req.params = merge(this.params || {}, req.params || {});
+
+        if (typeof err !== 'undefined') {
+            if (this.fn.length === 4) {
+                try {
+                    this.fn(err, req, res, next);
+                } catch (e) {
+                    next(err);
+                }
+
+                return;
+            }
+
+            next(err);
             return;
         }
 
-        try {
-            this.handle(error, req, res, next);
-        } catch (e) {
-            next(error);
-        }
-    }
-
-    handleRequest(req, res, next) {
-        if (this.handle.length > 3) {
+        if (this.fn.length > 3) {
             next();
             return;
         }
 
         try {
-            this.handle(req, res, next);
+            const output = this.fn(req, res, next);
+            if (output instanceof Promise) {
+                output.catch((e) => next(e));
+            }
         } catch (e) {
             next(e);
         }
     }
+
+    // --------------------------------------------------
 
     exec(path: string | null) : boolean {
         let match : RegExpExecArray;

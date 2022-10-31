@@ -1,16 +1,31 @@
+/*
+ * Copyright (c) 2022.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
+
 import { Connection, ConsumeMessage, Options } from 'amqplib';
 import { RPC } from '../shared';
+import { bufferFromData } from '../utils';
+import { RPCServerResponse } from './response';
 import { RPCServerRouter } from './router';
-import { RPCServerHandler } from './type';
+import {
+    RPCServerHandler, RPCServerRequestInterface, RPCServerResponseCallbackContext,
+} from './type';
 
 export class RPCServer extends RPC {
     protected router : RPCServerRouter;
+
+    // --------------------------------------------------
 
     constructor(connection: Connection) {
         super(connection);
 
         this.router = new RPCServerRouter();
     }
+
+    // --------------------------------------------------
 
     async listen() {
         const channel = await this.connect();
@@ -30,6 +45,8 @@ export class RPCServer extends RPC {
         return channel;
     }
 
+    // --------------------------------------------------
+
     private async handleIncomingMessage(data: ConsumeMessage | null) {
         if (typeof data === 'undefined') {
             return;
@@ -43,28 +60,64 @@ export class RPCServer extends RPC {
             correlationId,
         };
 
-        try {
-            const result = await this.dispatchMessage(data);
+        const result = await this.dispatchMessage(data);
 
-            this.channel.sendToQueue(
-                replyTo,
-                result,
-                options,
-            );
-        } catch (e) {
-            this.channel.sendToQueue(
-                replyTo,
-                null,
-                options,
-            );
-        }
+        this.channel.sendToQueue(
+            replyTo,
+            bufferFromData(result),
+            options,
+        );
     }
 
-    private async dispatchMessage(data: ConsumeMessage) : Promise<Buffer> {
-        const content = Buffer.from(data.content).toString('utf-8');
+    private async dispatchMessage(message: ConsumeMessage) : Promise<RPCServerResponseCallbackContext> {
+        const content = Buffer.from(message.content).toString('utf-8');
+        const body = JSON.parse(content);
 
-        // find handler for message see: express :)
+        let timeout : ReturnType<typeof setTimeout> | undefined;
+
+        return new Promise<RPCServerResponseCallbackContext>((resolve) => {
+            const handleError = (e: unknown) => {
+                clearTimeout(timeout);
+
+                const response = new RPCServerResponse((data) => resolve(data));
+                response.status(500);
+                response.send({
+                    message: e instanceof Error ? e.message : 'Unknown',
+                    statusCode: 500,
+                    code: 'xxx',
+                });
+            };
+
+            timeout = setTimeout(() => handleError(new Error('The request handler timed out.')), 60_000);
+
+            const req = this.createRequest({
+                body,
+            });
+
+            const res = new RPCServerResponse((data) => {
+                clearTimeout(timeout);
+
+                resolve(data);
+            });
+
+            try {
+                this.router.dispatch(req, res);
+            } catch (e) {
+                handleError(e);
+            }
+        });
     }
+
+    private createRequest(data: Partial<RPCServerRequestInterface>) : RPCServerRequestInterface {
+        return {
+            body: {},
+            path: '', // todo: fill form message queue message
+            method: '', // todo: fill form message queue message
+            ...data,
+        };
+    }
+
+    // --------------------------------------------------
 
     get(path: string, handler: RPCServerHandler) : void {
         this.router.get(path, handler);
@@ -78,7 +131,11 @@ export class RPCServer extends RPC {
         this.router.delete(path, handler);
     }
 
-    use(path: string, router: RPCServerRouter) {
-        this.router.use(path, router);
+    use(router: RPCServerRouter) {
+        this.router.use(router);
+    }
+
+    useMiddleware(middleware: RPCServerHandler) {
+        this.router.useMiddleware(middleware);
     }
 }
