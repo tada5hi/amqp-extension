@@ -5,15 +5,41 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { Options } from 'amqplib';
+import {
+    Channel, MessageFields, MessageProperties, Options,
+} from 'amqplib';
 import { Config } from '../config';
-import { Message, MessageContext } from '../message';
 import { ConsumeHandlerAnyKey } from './static';
 
-export type ConsumeHandler = (message: Message, context: MessageContext) => Promise<void>;
+export type ConsumeMessage = {
+    /**
+     *
+     * Default: <generated uuid>
+     */
+    id?: string;
+
+    /**
+     * Event- or Command-name.
+     */
+    type?: string;
+
+    /**
+     * Metadata object to provide details for the message broker.
+     *
+     * Default: {}
+     */
+    metadata: MessageProperties & MessageFields;
+
+    /**
+     * The message data.
+     *
+     */
+    data: any;
+};
+export type ConsumeMessageHandler = (message: ConsumeMessage, channel: Channel) => Promise<void>;
 export type ConsumeHandlerAnyKeyType = typeof ConsumeHandlerAnyKey;
 
-export type ConsumeHandlers = Record<ConsumeHandlerAnyKeyType | string, ConsumeHandler>;
+export type ConsumeHandlers = Record<ConsumeHandlerAnyKeyType | string, ConsumeMessageHandler>;
 
 export type ConsumeOptions = {
     /**
@@ -25,12 +51,14 @@ export type ConsumeOptions = {
      * Config key or object.
      */
     alias?: string | Config,
+
     /**
      * Queue name.
      *
      * Default: ''
      */
-    name?: string,
+    queueName?: string,
+
     /**
      * Amqplib consume options.
      *

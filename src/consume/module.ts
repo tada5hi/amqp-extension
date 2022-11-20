@@ -7,7 +7,6 @@
 
 import { Options, Replies } from 'amqplib';
 import { Config, getConfig } from '../config';
-import { Message, MessageContext } from '../message';
 import { createChannel } from '../utils';
 import { ConsumeHandlers, ConsumeOptions } from './type';
 import { ConsumeHandlerAnyKey } from './static';
@@ -18,9 +17,9 @@ export async function consumeQueue(
     handlers: ConsumeHandlers,
 ) : Promise<void> {
     const config : Config = getConfig(options.alias);
-    const { channel, connection } = await createChannel(config);
+    const { channel } = await createChannel(config);
 
-    const queueName : string = options.name ?? '';
+    const queueName : string = options.queueName ?? '';
 
     const assertionQueue = await channel.assertQueue(queueName, {
         durable: false,
@@ -41,20 +40,23 @@ export async function consumeQueue(
         ...(options.options ?? {}),
     };
 
+    await channel.prefetch(1);
+
     await channel.consume(assertionQueue.queue, ((async (message) => {
         if (!message) {
             return;
         }
 
-        const content : Message = JSON.parse(message.content.toString('utf-8'));
-        const handler = handlers[content.type] ?? handlers[ConsumeHandlerAnyKey];
+        const { type, contentType, messageId } = message.properties;
+        const handler = handlers[type] ?? handlers[ConsumeHandlerAnyKey];
 
-        const context : MessageContext = {
-            channel,
-            connection,
-            messageFields: message.fields,
-            messageProperties: message.properties,
-        };
+        let { content } = message;
+        if (contentType) {
+            switch (contentType.toLowerCase()) {
+                case 'application/json':
+                    content = JSON.parse(message.content.toString('utf-8'));
+            }
+        }
 
         const requeueOnFailure : boolean = config.consume?.requeueOnFailure ?? false;
 
@@ -64,7 +66,16 @@ export async function consumeQueue(
         }
 
         try {
-            await handler(content, context);
+            await handler({
+                id: messageId,
+                type,
+                data: content,
+                metadata: {
+                    ...message.properties,
+                    ...message.fields,
+                },
+            }, channel);
+
             channel.ack(message);
         } catch (e) {
             channel.reject(message, requeueOnFailure);

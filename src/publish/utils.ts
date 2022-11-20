@@ -8,28 +8,67 @@
 /* istanbul ignore next */
 import { Options } from 'amqplib';
 import { Config, getConfig } from '../config';
-import { Message } from '../message';
 import { createChannel } from '../utils';
-import { PublishOptions } from './type';
+import { PublishMessage } from './type';
 
 /* istanbul ignore next */
-export async function publishMessage(
-    message: Message,
-    options?: PublishOptions,
-) {
-    const { options: messageOptions, ...messagePayload } = message;
+export async function publishMessage(message: PublishMessage) {
+    let buffer = message.data;
 
-    const buffer: Buffer = Buffer.from(JSON.stringify(messagePayload));
+    if (!Buffer.isBuffer(buffer)) {
+        buffer = Buffer.from(buffer);
+    }
 
-    options ??= {};
-    const config: Config = getConfig(options.alias);
+    const config: Config = getConfig(message.alias);
     const { channel } = await createChannel(config);
 
     const publishOptions: Options.Publish = {
         ...(config.publish?.options ?? {}),
-        ...(messageOptions.publish ?? {}),
-        ...(options.options ?? {}),
+        ...(message.metadata ?? {}),
     };
 
-    channel.publish(config.exchange.name, messageOptions.routingKey, buffer, publishOptions);
+    if (message.id) {
+        publishOptions.messageId = message.id;
+    }
+
+    if (message.type) {
+        publishOptions.type = message.type;
+    }
+
+    let { routingKey } = message;
+
+    if (
+        typeof routingKey === 'undefined' &&
+        typeof config.consume !== 'undefined' &&
+        typeof config.consume.routingKey !== 'undefined'
+    ) {
+        routingKey = Array.isArray(config.consume.routingKey) ?
+            [...config.consume.routingKey].shift() :
+            config.consume.routingKey;
+    }
+
+    if (typeof config.exchange !== 'undefined') {
+        channel.publish(config.exchange.name, routingKey || '', buffer, publishOptions);
+    }
+
+    // publish to nameless exchange
+
+    let queueName : string | undefined;
+
+    if (
+        typeof config.publish !== 'undefined' &&
+        typeof config.publish.queueName !== 'undefined'
+    ) {
+        queueName = config.publish.queueName;
+    }
+
+    if (typeof message.queueName !== 'undefined') {
+        queueName = message.queueName;
+    }
+
+    if (typeof queueName === 'undefined') {
+        // todo: throw error
+    }
+
+    channel.sendToQueue(queueName, buffer, publishOptions);
 }

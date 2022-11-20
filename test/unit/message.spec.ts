@@ -1,7 +1,7 @@
-import {buildMessage, BuildMessageContext, Message} from "../../src";
+import {buildMessage} from "../../src";
 
 describe('src/message/*.ts', () => {
-    const exampleMessage : BuildMessageContext = {
+    const exampleMessage : PublishMessage = {
         id: '1',
         type: 'thingsHappened',
         options: {
@@ -10,7 +10,7 @@ describe('src/message/*.ts', () => {
     };
 
     it('should build message', () => {
-        let message : Message = buildMessage(exampleMessage);
+        let message : ConsumeMessage = buildMessage(exampleMessage);
         expect(message).toEqual({...exampleMessage, data: {}, metadata: {}});
 
         message = buildMessage({...exampleMessage, data: {id: 1}});

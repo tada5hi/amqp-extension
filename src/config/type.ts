@@ -14,11 +14,13 @@ export type ExchangeType = 'fanout' | 'direct' | 'topic' | 'match' | string;
 export type Config = {
     alias?: string,
     connection: Options.Connect | string,
-    exchange: {
-        name: string,
-        type: ExchangeType,
-        options?: Options.AssertExchange
-    },
+    exchange: ExchangeOptions,
     publish?: PublishOptions,
     consume?: ConsumeOptions
+};
+
+export type ExchangeOptions = {
+    name: string,
+    type: ExchangeType,
+    options?: Options.AssertExchange
 };
