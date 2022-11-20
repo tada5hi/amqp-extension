@@ -5,24 +5,25 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { Connection, ConsumeMessage, Options } from 'amqplib';
-import { RPC } from '../shared';
-import { bufferFromData } from '../utils';
-import { RPCServerResponse } from './response';
-import { RPCServerRouter } from './router';
 import {
-    RPCServerHandler, RPCServerRequestInterface, RPCServerResponseCallbackContext,
-} from './type';
+    Connection, ConsumeMessage, Message, Options,
+} from 'amqplib';
+import { Router, setRequestHeader } from 'routup';
+import { RPCHeader } from '../constants';
+import { RPC } from '../shared';
+import { RPCServerRequest } from './request';
+import { RPCServerResponse } from './response';
+import { useResponseBody } from './utils/response';
 
 export class RPCServer extends RPC {
-    protected router : RPCServerRouter;
+    protected router : Router;
 
     // --------------------------------------------------
 
-    constructor(connection: Connection) {
+    constructor(connection: Connection, router: Router) {
         super(connection);
 
-        this.router = new RPCServerRouter();
+        this.router = router;
     }
 
     // --------------------------------------------------
@@ -64,78 +65,47 @@ export class RPCServer extends RPC {
 
         this.channel.sendToQueue(
             replyTo,
-            bufferFromData(result),
-            options,
+            useResponseBody(result),
+            {
+                ...options,
+                headers: {
+                    ...result.getHeaders(),
+                    [RPCHeader.STATUS_CODE]: result.statusCode,
+                    [RPCHeader.STATUS_MESSAGE]: result.statusMessage,
+                },
+            },
         );
-    }
-
-    private async dispatchMessage(message: ConsumeMessage) : Promise<RPCServerResponseCallbackContext> {
-        const content = Buffer.from(message.content).toString('utf-8');
-        const body = JSON.parse(content);
-
-        let timeout : ReturnType<typeof setTimeout> | undefined;
-
-        return new Promise<RPCServerResponseCallbackContext>((resolve) => {
-            const handleError = (e: unknown) => {
-                clearTimeout(timeout);
-
-                const response = new RPCServerResponse((data) => resolve(data));
-                response.status(500);
-                response.send({
-                    message: e instanceof Error ? e.message : 'Unknown',
-                    statusCode: 500,
-                    code: 'xxx',
-                });
-            };
-
-            timeout = setTimeout(() => handleError(new Error('The request handler timed out.')), 60_000);
-
-            const req = this.createRequest({
-                body,
-            });
-
-            const res = new RPCServerResponse((data) => {
-                clearTimeout(timeout);
-
-                resolve(data);
-            });
-
-            try {
-                this.router.dispatch(req, res);
-            } catch (e) {
-                handleError(e);
-            }
-        });
-    }
-
-    private createRequest(data: Partial<RPCServerRequestInterface>) : RPCServerRequestInterface {
-        return {
-            body: {},
-            path: '', // todo: fill form message queue message
-            method: '', // todo: fill form message queue message
-            ...data,
-        };
     }
 
     // --------------------------------------------------
 
-    get(path: string, handler: RPCServerHandler) : void {
-        this.router.get(path, handler);
+    private async dispatchMessage(message: ConsumeMessage) : Promise<RPCServerResponse> {
+        const req = this.createServerRequest(message);
+        const res = new RPCServerResponse();
+
+        await this.router.dispatchAsync(req, res);
+
+        return res;
     }
 
-    post(path: string, handler: RPCServerHandler) : void {
-        this.router.post(path, handler);
-    }
+    // --------------------------------------------------
 
-    delete(path: string, handler: RPCServerHandler) : void {
-        this.router.delete(path, handler);
-    }
+    private createServerRequest(message: Message) {
+        const request = new RPCServerRequest({
+            headers: message.properties.headers,
+        });
 
-    use(router: RPCServerRouter) {
-        this.router.use(router);
-    }
+        if (message.properties.contentType) {
+            setRequestHeader(request, RPCHeader.CONTENT_TYPE, message.properties.contentType);
+        }
 
-    useMiddleware(middleware: RPCServerHandler) {
-        this.router.useMiddleware(middleware);
+        if (message.properties.contentEncoding) {
+            setRequestHeader(request, RPCHeader.CONTENT_ENCODING, message.properties.contentEncoding);
+        }
+
+        const contentEncoding = request.headers[RPCHeader.CONTENT_ENCODING] || message.properties.contentEncoding;
+        request.push(message.content, contentEncoding);
+
+        return request;
     }
 }

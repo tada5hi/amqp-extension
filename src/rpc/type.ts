@@ -5,22 +5,10 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { RPCState } from './constants';
+import { OutgoingHttpHeaders } from 'http';
 
-export type RPCError = {
-    code: string,
-    message: string,
-    statusCode?: number
+export type RPCResponse<T = any> = {
+    data: T,
+    headers: OutgoingHttpHeaders,
+    statusCode: number
 };
-
-export type RPCSuccessResponse<T> = {
-    state: `${RPCState.SUCCESS}`,
-    data: T
-};
-
-export type RPCErrorResponse = {
-    state: `${RPCState.ERROR}`,
-    data: RPCError
-};
-
-export type RPCResponse<T> = RPCSuccessResponse<T> | RPCErrorResponse;

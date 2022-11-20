@@ -5,11 +5,13 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-export type RPCClientRequestResolve<T> = (data: T) => void;
-export type RPCClientRequestReject = (error: Error) => void;
+import { RPCResponse } from '../type';
 
-export type RPCClientRequest<T> = {
+export type RPCClientRequestPromiseResolve<T> = (data: RPCResponse<T>) => void;
+export type RPCClientRequestPromiseReject<E = unknown> = (data: RPCResponse<E>) => void;
+
+export type RPCClientRequest<R, E = unknown> = {
     timeout: ReturnType<typeof setTimeout>,
-    resolve: RPCClientRequestResolve<T>,
-    reject: RPCClientRequestReject,
+    resolve: RPCClientRequestPromiseResolve<R>,
+    reject: RPCClientRequestPromiseReject<E>
 };

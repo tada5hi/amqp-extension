@@ -8,11 +8,10 @@
 import {
     Channel, Connection, ConsumeMessage,
 } from 'amqplib';
-import { RPCState } from '../constants';
+import { publishMessage } from '../../publish';
+import { RPCHeader } from '../constants';
 import { RPC } from '../shared';
-import { RPCResponse } from '../type';
-import { bufferToData } from '../utils';
-import { RPCClientRequest, RPCClientRequestReject, RPCClientRequestResolve } from './type';
+import { RPCClientRequest, RPCClientRequestPromiseReject, RPCClientRequestPromiseResolve } from './type';
 
 export class RPCClient extends RPC {
     protected requests: Record<string, RPCClientRequest<any>> = {};
@@ -21,8 +20,10 @@ export class RPCClient extends RPC {
 
     protected timeout : number;
 
-    constructor(connection: Connection) {
+    constructor(connection: Connection, queueName: string) {
         super(connection);
+
+        this.queueName = queueName;
 
         this.requestId = 0;
         this.timeout = 60_000;
@@ -85,35 +86,35 @@ export class RPCClient extends RPC {
 
         clearTimeout(request.timeout);
 
-        try {
-            const response = bufferToData<RPCResponse<any>>(data.content);
+        const { [RPCHeader.STATUS_CODE]: statusCode } = data.properties.headers;
 
-            if (response.state === RPCState.SUCCESS) {
-                request.resolve(response.data);
-            } else {
-                const error = new Error(response.data.message);
-                request.reject(error);
-            }
-        } catch (e) {
-            if (e instanceof Error) {
-                request.reject(e);
-            }
+        // todo: format content, depending on content-type.
+
+        if (statusCode >= 400 && statusCode <= 599) {
+            request.reject({
+                headers: data.properties.headers,
+                data: data.content,
+                statusCode,
+            });
+        } else {
+            request.resolve({
+                headers: data.properties.headers,
+                data: data.content,
+                statusCode,
+            });
         }
     }
 
     async request<T>(data: T) {
         const correlationId = `${this.requestId++}`;
 
-        /*
         const options : Options.Publish = {
             replyTo: this.queueName,
             correlationId,
         };
 
-         */
-
-        let resolve : RPCClientRequestResolve<T>;
-        let reject : RPCClientRequestReject;
+        let resolve : RPCClientRequestPromiseResolve<T>;
+        let reject : RPCClientRequestPromiseReject<any>;
 
         const promise = new Promise((res, rej) => {
             resolve = res;
@@ -142,6 +143,10 @@ export class RPCClient extends RPC {
 
         delete this.requests[id];
 
-        request.reject(new Error('The request timed out...'));
+        request.reject({
+            data: new Error('The request timed out...'),
+            statusCode: 500,
+            headers: {},
+        });
     }
 }
