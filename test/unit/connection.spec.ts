@@ -1,16 +1,18 @@
 import {clearConnections, getConnections} from "../../src";
 
 describe('src/connection', () => {
-    it('should get/clear connections', () => {
+    it('should get/clear connections', async () => {
         let connections = getConnections();
+        let connectionKeys = Object.keys(connections);
 
-        expect(connections).toBeDefined();
-        expect(connections.size).toEqual(0);
+        expect(connectionKeys).toBeDefined();
+        expect(connectionKeys.length).toEqual(0);
 
-        clearConnections();
+        await clearConnections();
 
         connections = getConnections()
+        connectionKeys = Object.keys(connections);
 
-        expect(connections.size).toEqual(0);
+        expect(connectionKeys.length).toEqual(0);
     });
 })

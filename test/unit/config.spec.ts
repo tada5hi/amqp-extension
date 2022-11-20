@@ -1,8 +1,8 @@
-import {Config, DEFAULT_KEY, getConfig, setConfig} from "../../src";
+import {Config, getConfig, getConfigKey, hasConfig, setConfig} from "../../src";
 
 describe('src/config/*.ts', () => {
     const data : Config = {
-        alias: DEFAULT_KEY,
+        alias: getConfigKey(),
         exchange: {
             name: 'test',
             type: 'direct'
@@ -17,8 +17,12 @@ describe('src/config/*.ts', () => {
     };
 
     it('should set config', () => {
+        expect(hasConfig()).toBeFalsy();
+
         let config = setConfig(data);
         expect(config).toEqual(data);
+
+        expect(hasConfig()).toBeTruthy();
 
         config = setConfig('test', testData);
         expect(config).toEqual(testData);
