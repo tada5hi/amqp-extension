@@ -5,60 +5,83 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { Options, Replies } from 'amqplib';
-import { Config, getConfig } from '../config';
-import { createChannel } from '../utils';
-import { ConsumeHandlers, ConsumeOptions } from './type';
+import { merge } from 'smob';
+import { InputConfig, getConfig } from '../config';
+import { useConnection } from '../connection';
+import { ExchangeOptions, buildDriverExchangeOptions, isDefaultExchange } from '../exchange';
+import { ConsumeOptions } from '../type';
+import { ConsumeHandlers } from './type';
 import { ConsumeHandlerAnyKey } from './static';
+import { buildDriverConsumeOptions } from './utils';
 
 /* istanbul ignore next */
-export async function consumeQueue(
+export async function consume(
     options: ConsumeOptions,
     handlers: ConsumeHandlers,
 ) : Promise<void> {
-    const config : Config = getConfig(options.alias);
-    const { channel } = await createChannel(config);
+    const config : InputConfig = getConfig(options.alias);
+    const connection = await useConnection(config.alias);
+    const channel = await connection.createChannel();
 
-    const queueName : string = options.queueName ?? '';
+    options = merge(options, config.consume);
 
-    const assertionQueue = await channel.assertQueue(queueName, {
-        durable: false,
-        autoDelete: true,
-    });
+    const exchangeOptions = merge(
+        options.exchange || {},
+        config.exchange,
+    ) as ExchangeOptions;
 
-    if (typeof options.routingKey !== 'undefined') {
-        const routingKeys: string[] = Array.isArray(options.routingKey) ? options.routingKey : [options.routingKey];
+    let queueName : string = options.queueName || config.publish.queueName || '';
 
-        const promises: Promise<Replies.Empty>[] = routingKeys
-            .map((routKey) => channel.bindQueue(assertionQueue.queue, config.exchange.name, routKey) as unknown as Promise<Replies.Empty>);
+    if (isDefaultExchange(exchangeOptions.type)) {
+        if (queueName === '') {
+            throw new Error('The queue name can not be empty if a non default exchange is selected.');
+        }
 
-        await Promise.all(promises);
+        await channel.assertQueue(queueName, {
+            durable: true,
+        });
+    } else {
+        await channel.assertExchange(
+            exchangeOptions.name,
+            exchangeOptions.type,
+            buildDriverExchangeOptions({
+                durable: true,
+                ...exchangeOptions,
+            }),
+        );
+
+        const assertionQueue = await channel.assertQueue('', {
+            durable: false,
+            autoDelete: true,
+            exclusive: true,
+        });
+
+        if (typeof exchangeOptions.routingKey === 'undefined') {
+            throw new Error('The routingKey can not be empty if a non default exchange is selected.');
+        }
+
+        await channel.bindQueue(
+            assertionQueue.queue,
+            config.exchange.name,
+            exchangeOptions.routingKey,
+        );
+
+        queueName = assertionQueue.queue;
     }
 
-    const consumeOptions : Options.Consume = {
-        ...(config.consume?.options ?? {}),
-        ...(options.options ?? {}),
-    };
+    if (typeof options.prefetchCount !== 'undefined') {
+        await channel.prefetch(options.prefetchCount);
+    }
 
-    await channel.prefetch(1);
-
-    await channel.consume(assertionQueue.queue, ((async (message) => {
+    await channel.consume(queueName, ((async (message) => {
         if (!message) {
             return;
         }
 
-        const { type, contentType, messageId } = message.properties;
-        const handler = handlers[type] ?? handlers[ConsumeHandlerAnyKey];
+        const handler = handlers[message.properties.type] ||
+            handlers[ConsumeHandlerAnyKey];
 
-        let { content } = message;
-        if (contentType) {
-            switch (contentType.toLowerCase()) {
-                case 'application/json':
-                    content = JSON.parse(message.content.toString('utf-8'));
-            }
-        }
-
-        const requeueOnFailure : boolean = config.consume?.requeueOnFailure ?? false;
+        const requeueOnFailure : boolean = config.consume.requeueOnFailure ?? false;
 
         if (typeof handler === 'undefined') {
             channel.reject(message, requeueOnFailure);
@@ -66,19 +89,11 @@ export async function consumeQueue(
         }
 
         try {
-            await handler({
-                id: messageId,
-                type,
-                data: content,
-                metadata: {
-                    ...message.properties,
-                    ...message.fields,
-                },
-            }, channel);
+            await handler(message, channel);
 
             channel.ack(message);
         } catch (e) {
             channel.reject(message, requeueOnFailure);
         }
-    })), consumeOptions);
+    })), buildDriverConsumeOptions(options));
 }

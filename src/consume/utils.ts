@@ -1,18 +1,18 @@
 import { Options } from 'amqplib';
+import { ConsumeOptions } from '../type';
 import { removeKeysFromOptions } from '../utils';
-import { PublishOptionsExtended } from './type';
 
-export function buildDriverPublishOptions(
-    options: PublishOptionsExtended,
-) : Options.Publish {
+export function buildDriverConsumeOptions(
+    options: ConsumeOptions,
+) : Options.Consume {
     return removeKeysFromOptions(
         { ...options },
         [
             'alias',
             'exchange',
             'queueName',
-            'data',
-            'id',
+            'requeueOnFailure',
+            'prefetchCount',
         ],
     );
 }

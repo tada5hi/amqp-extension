@@ -5,12 +5,12 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { Config } from './type';
-import { getConfigKey } from './utils';
+import { Config, InputConfig } from './type';
+import { extendConfig, getConfigKey } from './utils';
 
 const instances : Record<string, Config> = {};
 
-export function setConfig(key: string | Config, value?: Config) : Config {
+export function setConfig(key: string | InputConfig, value?: InputConfig) : Config {
     if (typeof key === 'string') {
         if (typeof value === 'undefined') {
             throw new Error(`A config must be defined for the alias: ${key}`);
@@ -18,16 +18,16 @@ export function setConfig(key: string | Config, value?: Config) : Config {
 
         value.alias = key;
 
-        instances[key] = value;
+        instances[key] = extendConfig(value);
 
-        return value;
+        return instances[key];
     }
 
     key.alias = getConfigKey(key.alias);
 
-    instances[key.alias] = key;
+    instances[key.alias] = extendConfig(key);
 
-    return key;
+    return instances[key.alias];
 }
 
 export function hasConfig(key?: string) {
@@ -36,10 +36,11 @@ export function hasConfig(key?: string) {
     return Object.prototype.hasOwnProperty.call(instances, key);
 }
 
-export function getConfig(key?: string | Config) : Config {
+export function getConfig(key?: string | InputConfig) : Config {
     if (typeof key === 'string' || typeof key === 'undefined') {
         key = getConfigKey(key);
         const data = instances[key];
+
         if (typeof data === 'undefined') {
             throw new Error(`A config must be defined for the alias: ${key}`);
         }
@@ -47,8 +48,7 @@ export function getConfig(key?: string | Config) : Config {
         return data;
     }
 
-    const config : Config = key;
-    config.alias = getConfigKey(config.alias);
+    const config : Config = extendConfig(key);
 
     setConfig(config);
 

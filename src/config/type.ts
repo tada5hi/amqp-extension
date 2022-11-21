@@ -6,21 +6,16 @@
  */
 
 import { Options } from 'amqplib';
-import { ConsumeOptions } from '../consume';
-import { PublishOptions } from '../publish';
-
-export type ExchangeType = 'fanout' | 'direct' | 'topic' | 'match' | string;
+import { ExchangeOptions } from '../exchange';
+import { ConsumeOptions, PublishOptions } from '../type';
 
 export type Config = {
-    alias?: string,
+    alias: string,
     connection: Options.Connect | string,
     exchange: ExchangeOptions,
-    publish?: PublishOptions,
-    consume?: ConsumeOptions
+    publish: PublishOptions,
+    consume: ConsumeOptions
 };
 
-export type ExchangeOptions = {
-    name: string,
-    type: ExchangeType,
-    options?: Options.AssertExchange
-};
+export type InputConfig = Partial<Exclude<Config, 'connection'>> &
+Pick<Config, 'connection'>;

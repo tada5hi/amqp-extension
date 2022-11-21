@@ -6,68 +6,11 @@
  */
 
 import {
-    Channel, MessageFields, MessageProperties, Options,
+    Channel, Message,
 } from 'amqplib';
-import { Config } from '../config';
 import { ConsumeHandlerAnyKey } from './static';
 
-export type ConsumeMessage = {
-    /**
-     *
-     * Default: <generated uuid>
-     */
-    id?: string;
-
-    /**
-     * Event- or Command-name.
-     */
-    type?: string;
-
-    /**
-     * Metadata object to provide details for the message broker.
-     *
-     * Default: {}
-     */
-    metadata: MessageProperties & MessageFields;
-
-    /**
-     * The message data.
-     *
-     */
-    data: any;
-};
-export type ConsumeMessageHandler = (message: ConsumeMessage, channel: Channel) => Promise<void>;
+export type ConsumeMessageHandler = (message: Message, channel: Channel) => Promise<void>;
 export type ConsumeHandlerAnyKeyType = typeof ConsumeHandlerAnyKey;
 
 export type ConsumeHandlers = Record<ConsumeHandlerAnyKeyType | string, ConsumeMessageHandler>;
-
-export type ConsumeOptions = {
-    /**
-     * Queue routing key(s).
-     */
-    routingKey?: string | string[],
-
-    /**
-     * Config key or object.
-     */
-    alias?: string | Config,
-
-    /**
-     * Queue name.
-     *
-     * Default: ''
-     */
-    queueName?: string,
-
-    /**
-     * Amqplib consume options.
-     *
-     * Default: { }
-     */
-    options?: Options.Consume;
-
-    /**
-     * Default: false
-     */
-    requeueOnFailure?: boolean;
-};

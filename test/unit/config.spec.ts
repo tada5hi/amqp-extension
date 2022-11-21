@@ -1,16 +1,16 @@
-import {Config, getConfig, getConfigKey, hasConfig, setConfig} from "../../src";
+import {InputConfig, getConfig, getConfigKey, hasConfig, setConfig, ExchangeType} from "../../src";
 
 describe('src/config/*.ts', () => {
-    const data : Config = {
+    const data : InputConfig = {
         alias: getConfigKey(),
         exchange: {
             name: 'test',
-            type: 'direct'
+            type: ExchangeType.DIRECT
         },
         connection: 'connection'
     };
 
-    const testData : Config = {
+    const testData : InputConfig = {
         ...data,
         alias: 'test',
         connection: 'test'

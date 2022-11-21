@@ -8,4 +8,6 @@
 export * from './config';
 export * from './consume';
 export * from './connection';
+export * from './exchange';
 export * from './publish';
+export * from './type';
