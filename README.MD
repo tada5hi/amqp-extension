@@ -13,18 +13,15 @@ All utility functions support the usage of multiple registered connections.
 
 - [Installation](#installation)
 - [Usage](#usage)
-  - [Publish](#publish)
-  - [Consume](#consume)
+  - [Publish](#publish-to-queue)
+  - [Consume](#consume-queue)
 - [Functions](#functions)
   - [setConfig](#setconfig)
   - [useConnection](#useconnection)
-  - [publishMessage](#publishmessage)
-  - [consumeQueue](#consumequeue)
+  - [publish](#publish)
+  - [consume](#consume)
 - [Types](#types)
   - [Config](#config-types)
-  - [Consume](#consume-types)
-  - [Message](#message-types)
-  - [Publish](#publish-types)
 - [License](#license)
 
 
@@ -36,17 +33,15 @@ npm install amqp-extension --save
 
 ## Usage
 
-### Publish
+### Publish to Queue
 
-To publish a queue message according the [Message Scheme](#message-types), use the `buildMessage` helper function
-to build a message and the `publishMessage` function to submit it to the message broker.
+The `publish` function allows you to send messages quickly.
+Existing options can be added or overwritten
 
 ```typescript
 import {
-    buildMessage,
-    Message,
     useConnection,
-    publishMessage,
+    publish,
     setConfig
 } from "amqp-extension";
 
@@ -59,33 +54,26 @@ setConfig({
     }
 });
 
-const message: Message = buildMessage({
-    type: 'resourceCreated',
-    options: {
-        routingKey: '<routing-key>'
-    }
-});
-
-console.log(message);
-// {id: 'xxxx-xxxx-xxxx-xxxx', type: 'resourceCreated', options: {routingKey: '<routing-key>'}, data: {}, metadata: {}}
-
 (async () => {
-    await publishMessage(message);
+    await publish({
+        data: {
+            type: 'resourceCreated',
+            name: 'foo'
+        }
+    });
 })();
 ```
 
-### Consume
+### Consume Queue
 
-To consume a queue message use the `consumeMessage` function. As first argument it accepts a configuration object
+To consume a queue use the `consume` function. As first argument it accepts a configuration object
 and as second argument and object to specify an async callback function handler for a specific message `type`.
 
 ```typescript
 import {
-    buildMessage,
+    consume,
+    ConsumeMessage,
     ConsumeOptions,
-    Message,
-    MessageContext,
-    publishMessage,
     setConfig
 } from "amqp-extension";
 
@@ -99,15 +87,18 @@ setConfig({
 });
 
 const options: ConsumeOptions = {
-    routingKey: '<routing-key>'
+    exchange: {
+        routingKey: '<routing-key>'
+    }
 }
 
 (async () => {
-    await consumeQueue(options, {
-        resourceCreated: async (message: Message, messageContext: MessageContext) => {
-            // do some async operation :)
-            console.log(message);
-            // {id: 'xxxx-xxxx-xxxx-xxxx', type: 'resourceCreated', data: {}, metadata: {}}
+    await consume(options, {
+        resourceCreated: async (message: ConsumeMessage) => {
+            const content = message.content.toString('utf-8');
+            const payload = JSON.parse(content);
+            console.log(payload);
+            // { type: 'resourceCreated', name: 'foo' }
         }
     });
 })();
@@ -120,12 +111,9 @@ get overwritten.
 
 ```typescript
 import {
-    buildMessage,
     ConsumeOptions,
-    Message,
-    MessageContext,
-    publishMessage,
-    PublishOptions,
+    publish,
+    PublishOptionsExtended,
     setConfig
 } from "amqp-extension";
 
@@ -146,19 +134,24 @@ setConfig({
         type: 'topic'
     }
 });
-
-const consumeOptions: ConsumeOptions = {
-    routingKey: '<routing-key>',
-    alias: 'foo' // <--- use another connection :)
-}
-
-const publishOptions: PublishOptions = {
-    alias: 'foo' // <--- use another connection :)
-}
-
 (async () => {
-    await consumeQueue({/* handlers */}, consumeOptions);
-    await publishMessage({/* message */}, publishOptions);
+    await consume(
+        {
+            routingKey: '<routing-key>',
+            alias: 'foo' // <--- use another connection :)
+        },
+        {
+            // ... handlers
+        }
+    );
+
+    await publish({
+        routingKey: '<routing-key>',
+        alias: 'foo', // <--- use another connection :)
+        data: {
+            foo: 'bar'
+        }
+    });
 })();
 
 ```
@@ -167,7 +160,7 @@ const publishOptions: PublishOptions = {
 
 ### setConfig
 
-▸ `function` **setConfig**(`key?: string | Config`, `value?: Config`): `Config`
+▸ `function` **setConfig**(`key?: string | ConfigInput`, `value?: ConfigInput`): `Config`
 
 Register a connection as `default` alias or specify an `<alias>` as config property.
 
@@ -196,7 +189,7 @@ import {setConfig, useConnection} from "amqp-extension";
 Define a non default connection.
 
 ```typescript
-import {setConfig, useConnection} from "amqp-extension";
+import { setConfig, useConnection } from "amqp-extension";
 
 (async () => {
     setConfig({
@@ -225,17 +218,17 @@ import {setConfig, useConnection} from "amqp-extension";
 
 #### Type parameters
 
-| Name | Description |
-| :------ | :------ |
+| Name  | Description |
+|:------|:------------|
 
 
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `key` | `string` or `Config` | Config object or alias of config. [more](#config-types) |
-| `value` | `Config` | Config object. [more](#config-types) |
+| Name    | Type                      | Description                                                |
+|:--------|:--------------------------|:-----------------------------------------------------------|
+| `key`   | `string` or `ConfigInput` | Config object or alias of config. [more](#config-types)    |
+| `value` | `Config`                  | Config object. [more](#config-types)                       |
 
 #### Returns
 
@@ -245,7 +238,7 @@ The function returns the Config object.
 
 ### useConnection
 
-▸ `function` **useConnection**(`key?: string | Config`): `Promise<Connection>`
+▸ `function` **useConnection**(`key?: string | ConfigInput`): `Promise<Connection>`
 
 Either register a connection as `default` alias or specify an `alias` as config property.
 If you have registered a connection you can receive the connection by specifying no arguments or provide an alias name if specified.
@@ -289,15 +282,15 @@ import {setConfig, useConnection} from "amqp-extension";
 
 #### Type parameters
 
-| Name | Description |
-| :------ | :------ |
+| Name  | Description   |
+|:------|:--------------|
 
 
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
+| Name  | Type                 | Description                                      |
+|:------|:---------------------|:-------------------------------------------------|
 | `key` | `string` or `Config` | Config or alias of config. [more](#config-types) |
 
 #### Returns
@@ -306,9 +299,9 @@ import {setConfig, useConnection} from "amqp-extension";
 
 The function returns the Connection object of the `amqplib`.
 
-### publishMessage
+### publish
 
-▸ `function` **publishMessage**(`message: Message`, `options?: PublishOptions`): `Promise<void>`
+▸ `function` **publish**(`message: Message`, `options?: PublishOptions`): `Promise<void>`
 
 Send the constructed queue message to the message broker.
 As second parameter a registered config can be used by specifying the alias or provide the full config object.
@@ -317,36 +310,29 @@ As second parameter a registered config can be used by specifying the alias or p
 
 ```typescript
 import {
-    buildMessage,
-    publishMessage
+    publish
 } from "amqp-extension";
 
-const message: Message = buildMessage({
-    type: 'resourceCreated',
-    options: {
-        routingKey: '<routing-key>'
-    }
-});
-
-console.log(message);
-// {id: 'xxxx-xxxx-xxxx-xxxx', type: 'resourceCreated', options: {routingKey: '<routing-key>'}, data: {}, metadata: {}}
-
 (async () => {
-    await publishMessage(message);
+    await publish({
+        data: {
+            type: 'resourceCreated'
+        }
+    });
 })();
 ```
 
 #### Type parameters
 
-| Name | Description |
-| :------ | :------ |
+| Name  | Description |
+|:------|:------------|
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `message` | `Message` | Constructed message object. [more](#message-types)|
-| `options` | `PublishOptions` | Publish options. [more](#publish-types) |
+| Name      | Type             | Description                 |
+|:----------|:-----------------|:----------------------------|
+| `message` | `Message`        | Constructed message object. |
+| `options` | `PublishOptions` | Publish options.            |
 
 #### Returns
 
@@ -354,9 +340,9 @@ console.log(message);
 
 The function does not return a value.
 
-### consumeQueue
+### consume
 
-▸ `function` **consumeQueue**(`options: ConsumeOptions`, `cb: ConsumeHandlers`): `Promise<void>`
+▸ `function` **consume**(`options: ConsumeOptions`, `cb: ConsumeHandlers`): `Promise<void>`
 
 Send the constructed queue message to the message broker.
 As second parameter a registered config can be used by specifying the alias or provide the full config object.
@@ -365,10 +351,9 @@ As second parameter a registered config can be used by specifying the alias or p
 
 ```typescript
 import {
-    consumeQueue,
+    consume,
     ConsumeOptions,
-    Message,
-    MessageContext
+    ConsumeMessage,
 } from "amqp-extension";
 
 const options: ConsumeOptions = {
@@ -376,11 +361,9 @@ const options: ConsumeOptions = {
 }
 
 (async () => {
-    await consumeQueue(options, {
-        '<type>': async (message: Message, messageContext: MessageContext) => {
+    await consume(options, {
+        '<type>': async (message: ConsumeMessage) => {
             // do some async action :)
-            console.log(message);
-            // {id: 'xxxx-xxxx-xxxx-xxxx', type: 'resourceCreated', data: {}, metadata: {}}
         }
     });
 })();
@@ -389,17 +372,17 @@ const options: ConsumeOptions = {
 
 #### Type parameters
 
-| Name | Description |
-| :------ | :------ |
+| Name   | Description |
+|:-------|:------------|
 
 
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `options` | `ConsumeOptions` | Consume options. [more](#consume-types)|
-| `handlers` | `ConsumeHandlers` | Handlers object. [more](#consume-types) |
+| Name       | Type              | Description        |
+|:-----------|:------------------|:-------------------|
+| `options`  | `ConsumeOptions`  | Consume options. ) |
+| `handlers` | `ConsumeHandlers` | Handlers object.   |
 
 #### Returns
 
@@ -412,125 +395,20 @@ The function does not return a value.
 ### Config Types
 
 ```typescript
-import {Options} from "amqplib";
-import {PublishOptions} from "amqp-extension";
-
-export type ExchangeType = 'fanout' | 'direct' | 'topic' | 'match' | string;
+import { Options } from 'amqplib';
+import { ExchangeOptions } from '../exchange';
+import { ConsumeOptions, PublishOptions } from '../type';
 
 export type Config = {
-    alias?: string,
+    alias: string,
     connection: Options.Connect | string,
-    exchange: {
-        name: string,
-        type: ExchangeType,
-        options?: Options.AssertExchange
-    },
-    publish?: PublishOptions,
-    consume?: ConsumeOptions
+    exchange: ExchangeOptions,
+    publish: PublishOptions,
+    consume: ConsumeOptions
 };
-```
 
-### Consume Types
-```typescript
-import {Options} from "amqplib";
-import {Config, MessageContext, Message} from "amqp-extension";
-
-export type ConsumeHandler = (message: Message, context: MessageContext) => Promise<void>;
-export type ConsumeHandlers = Record<'$any' | string, ConsumeHandler>;
-
-export type ConsumeOptions = {
-    /**
-     * Queue routing key(s).
-     */
-    routingKey?: string | string[],
-
-    /**
-     * Config key or object.
-     */
-    alias?: string | Config,
-    /**
-     * Queue name.
-     *
-     * Default: ''
-     */
-    name?: string,
-    /**
-     * Amqplib consume options.
-     *
-     * Default: {}
-     */
-    options?: Options.Consume
-}
-```
-
-### Message Types
-
-```typescript
-import {Options} from "amqplib";
-
-export interface MessageOptions {
-    /**
-     * Routing key for message broker.
-     */
-    routingKey?: string;
-    /**
-     * Override default publish options.
-     */
-    publish?: Options.Publish;
-}
-
-export type Message = {
-    /**
-     * Routing information for amqp library.
-     * This property will be removed, before it is passed to the message queue.
-     */
-    options?: MessageOptions;
-
-    /**
-     *
-     * Default: <generated uuid>
-     */
-    id: string;
-
-    /**
-     * Event- or Command-name.
-     */
-    type: string;
-
-    /**
-     * Metadata object to provide details for the message broker.
-     *
-     * Default: {}
-     */
-    metadata: Record<string, any>;
-
-    /**
-     * The message data.
-     *
-     * Default: {}
-     */
-    data: Record<string, any>;
-};
-```
-
-### Publish Types
-
-```typescript
-import {Options} from "amqplib";
-import {Config} from "amqp-extension";
-
-export type PublishOptions = {
-    /**
-     * Config key or object.
-     */
-    alias?: string | Config;
-
-    /**
-     * Amqplib publish options.
-     */
-    options?: Options.Publish;
-}
-
+export type ConfigInput = Partial<Exclude<Config, 'connection'>> &
+    Pick<Config, 'connection'>;
 ```
 
 ## License

@@ -1,43 +1,26 @@
-import { Config } from './type';
+/*
+ * Copyright (c) 2022-2022.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
 
-export const DEFAULT_KEY = 'default';
+import { ExchangeType } from '../exchange';
+import { Config, ConfigInput } from './type';
 
-const configMap: Map<string, Config> = new Map<string, Config>();
-
-export function setConfig(key: string | Config, value?: Config) : Config {
-    if (typeof key === 'string') {
-        if (typeof value === 'undefined') {
-            throw new Error(`A config must be defined for the alias: ${key}`);
-        }
-
-        value.alias = key;
-
-        configMap.set(key, value);
-
-        return value;
-    }
-    key.alias ??= DEFAULT_KEY;
-    configMap.set(key.alias, key);
-
-    return key;
+export function getConfigKey(alias?: string) {
+    return alias || 'default';
 }
 
-export function getConfig(key?: string | Config) : Config {
-    key ??= DEFAULT_KEY;
-
-    if (typeof key === 'string') {
-        const data : Config | undefined = configMap.get(key);
-        if (typeof data === 'undefined') {
-            throw new Error(`A config must be defined for the alias: ${key}`);
-        }
-
-        return data;
-    }
-
-    const config : Config = key;
-    config.alias ??= DEFAULT_KEY;
-
-    setConfig(config);
-
-    return config;
+export function extendConfig(input: ConfigInput) : Config {
+    return {
+        alias: getConfigKey(input.alias),
+        connection: input.connection,
+        publish: input.publish || {},
+        consume: input.consume || {},
+        exchange: input.exchange || {
+            name: '',
+            type: ExchangeType.DEFAULT,
+        },
+    };
 }

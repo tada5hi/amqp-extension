@@ -1,14 +1,22 @@
-import { Options } from 'amqplib';
-import { Config } from '../config';
+/*
+ * Copyright (c) 2022.
+ * Author Peter Placzek (tada5hi)
+ * For the full copyright and license information,
+ * view the LICENSE file that was distributed with this source code.
+ */
 
-export type PublishOptions = {
+import { PublishOptions } from '../type';
+
+export type PublishOptionsExtended = {
     /**
-     * Config key or object.
+     * Alias for: messageId
+     *
+     * Default: <generated uuid>
      */
-    alias?: string | Config;
+    id?: string;
 
     /**
-     * Amqplib publish options.
+     * The message data.
      */
-    options?: Options.Publish;
-};
+    data: any,
+} & PublishOptions;

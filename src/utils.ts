@@ -1,26 +1,18 @@
-import { Channel, Connection, Options } from 'amqplib';
-import { Config, getConfig } from './config';
-import { useConnection } from './connection';
+import { hasOwnProperty } from 'smob';
 
-/* istanbul ignore next */
-export async function createChannel(key: string | Config) : Promise<{
-    channel: Channel,
-    connection: Connection
-}> {
-    const config : Config = getConfig(key);
+export function removeKeysFromOptions<
+    T extends Record<string, any>,
+    K extends(
+        keyof T)[],
+    >(
+    options: T,
+    keys: K,
+) : Omit<T, K[number]> {
+    for (let i = 0; i < keys.length; i++) {
+        if (hasOwnProperty(options, keys[i])) {
+            delete options[keys[i]];
+        }
+    }
 
-    const connection : Connection = await useConnection(config.alias);
-    const channel : Channel = await connection.createChannel();
-
-    const exchangeOptions : Options.AssertExchange = {
-        durable: true,
-        ...(config.exchange?.options ?? {}),
-    };
-
-    await channel.assertExchange(config.exchange.name, config.exchange.type, exchangeOptions);
-
-    return {
-        channel,
-        connection,
-    };
+    return options as Omit<T, K[number]>;
 }
