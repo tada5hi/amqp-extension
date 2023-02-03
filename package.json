@@ -35,6 +35,7 @@
     },
     "homepage": "https://github.com/Tada5hi/amqp-extension#readme",
     "dependencies": {
+        "@types/amqplib": "^0.10.0",
         "amqplib": "^0.10.3",
         "smob": "^0.1.0",
         "uuid": "^9.0.0"
@@ -49,7 +50,6 @@
         "@semantic-release/release-notes-generator": "^10.0.3",
         "@tada5hi/eslint-config-typescript": "^1.1.1",
         "@tada5hi/tsconfig": "^0.4.0",
-        "@types/amqplib": "^0.10.0",
         "@types/jest": "^27.4.1",
         "@types/node": "^18.11.9",
         "@types/uuid": "^8.3.4",
