@@ -56,7 +56,7 @@ setConfig({
 
 (async () => {
     await publish({
-        data: {
+        content: {
             type: 'resourceCreated',
             name: 'foo'
         }
@@ -148,7 +148,7 @@ setConfig({
     await publish({
         routingKey: '<routing-key>',
         alias: 'foo', // <--- use another connection :)
-        data: {
+        content: {
             foo: 'bar'
         }
     });
@@ -315,7 +315,7 @@ import {
 
 (async () => {
     await publish({
-        data: {
+        content: {
             type: 'resourceCreated'
         }
     });
