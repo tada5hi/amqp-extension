@@ -20,8 +20,10 @@ export async function publish(options: PublishOptionsExtended) {
 
     if (Buffer.isBuffer(options.data)) {
         buffer = options.data;
-    } else {
+    } else if (typeof options.data === 'string') {
         buffer = Buffer.from(options.data, 'utf-8');
+    } else {
+        buffer = Buffer.from(JSON.stringify(options.data), 'utf-8');
     }
 
     const config = getConfig(options.alias);

@@ -12,12 +12,14 @@
     "rules": {
         "class-methods-use-this": "off",
         "import/no-cycle": [2, {
-            "maxDepth": 1
+            "maxDepth": 1,
         }],
 
+        "no-underscore-dangle": "off",
         "no-continue": "off",
         "no-use-before-define": "off",
         "no-nested-ternary": "off",
+        "no-shadow": "off",
 
         "@typescript-eslint/no-unused-vars": "off",
         "@typescript-eslint/no-use-before-define": "off"

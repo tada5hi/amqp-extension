@@ -5,12 +5,16 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import {
-    Channel, Message,
+import type {
+    Channel, ConsumeMessage,
 } from 'amqplib';
 import { ConsumeHandlerAnyKey } from './static';
 
-export type ConsumeMessageHandler = (message: Message, channel: Channel) => Promise<void>;
+export {
+    ConsumeMessage,
+};
+
+export type ConsumeMessageHandler = (message: ConsumeMessage, channel: Channel) => Promise<void>;
 export type ConsumeHandlerAnyKeyType = typeof ConsumeHandlerAnyKey;
 
 export type ConsumeHandlers = Record<ConsumeHandlerAnyKeyType | string, ConsumeMessageHandler>;
