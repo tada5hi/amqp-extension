@@ -1,12 +1,12 @@
 import { Options } from 'amqplib';
-import { InputConfig } from './config';
+import { ConfigInput } from './config';
 import { ExchangeOptions } from './exchange';
 
 type CommonOptions = {
     /**
      * Config key or object.
      */
-    alias?: string | InputConfig;
+    alias?: string | ConfigInput;
 
     /**
      * Exchange

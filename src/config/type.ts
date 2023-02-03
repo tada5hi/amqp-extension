@@ -17,5 +17,5 @@ export type Config = {
     consume: ConsumeOptions
 };
 
-export type InputConfig = Partial<Exclude<Config, 'connection'>> &
+export type ConfigInput = Partial<Exclude<Config, 'connection'>> &
 Pick<Config, 'connection'>;

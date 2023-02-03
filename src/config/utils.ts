@@ -6,13 +6,13 @@
  */
 
 import { ExchangeType } from '../exchange';
-import { Config, InputConfig } from './type';
+import { Config, ConfigInput } from './type';
 
 export function getConfigKey(alias?: string) {
     return alias || 'default';
 }
 
-export function extendConfig(input: InputConfig) : Config {
+export function extendConfig(input: ConfigInput) : Config {
     return {
         alias: getConfigKey(input.alias),
         connection: input.connection,

@@ -6,7 +6,7 @@
  */
 
 import RabbitMQ, { Connection, Options } from 'amqplib';
-import { InputConfig, getConfig, getConfigKey } from '../config';
+import { ConfigInput, getConfig, getConfigKey } from '../config';
 
 const instances: Record<string, Connection> = {};
 
@@ -31,7 +31,7 @@ export function getConnections() : Record<string, Connection> {
 
 /* istanbul ignore next */
 export async function useConnection(
-    key: string | InputConfig,
+    key: string | ConfigInput,
 ) : Promise<Connection> {
     const config = getConfig(key);
 

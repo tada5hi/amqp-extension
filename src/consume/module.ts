@@ -6,7 +6,7 @@
  */
 
 import { merge } from 'smob';
-import { InputConfig, getConfig } from '../config';
+import { ConfigInput, getConfig } from '../config';
 import { useConnection } from '../connection';
 import { ExchangeOptions, buildDriverExchangeOptions, isDefaultExchange } from '../exchange';
 import { ConsumeOptions } from '../type';
@@ -19,7 +19,7 @@ export async function consume(
     options: ConsumeOptions,
     handlers: ConsumeHandlers,
 ) : Promise<void> {
-    const config : InputConfig = getConfig(options.alias);
+    const config : ConfigInput = getConfig(options.alias);
     const connection = await useConnection(config.alias);
     const channel = await connection.createChannel();
 
