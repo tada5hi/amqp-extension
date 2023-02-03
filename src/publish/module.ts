@@ -18,12 +18,12 @@ import { buildDriverPublishOptions } from './utils';
 export async function publish(options: PublishOptionsExtended) {
     let buffer : Buffer;
 
-    if (Buffer.isBuffer(options.data)) {
-        buffer = options.data;
-    } else if (typeof options.data === 'string') {
-        buffer = Buffer.from(options.data, 'utf-8');
+    if (Buffer.isBuffer(options.content)) {
+        buffer = options.content;
+    } else if (typeof options.content === 'string') {
+        buffer = Buffer.from(options.content, 'utf-8');
     } else {
-        buffer = Buffer.from(JSON.stringify(options.data), 'utf-8');
+        buffer = Buffer.from(JSON.stringify(options.content), 'utf-8');
     }
 
     const config = getConfig(options.alias);

@@ -7,7 +7,7 @@
 
 import { PublishOptions } from '../type';
 
-export type PublishOptionsExtended = {
+export type PublishOptionsExtended<T = any> = {
     /**
      * Alias for: messageId
      *
@@ -18,5 +18,5 @@ export type PublishOptionsExtended = {
     /**
      * The message data.
      */
-    data: any,
+    content: T,
 } & PublishOptions;

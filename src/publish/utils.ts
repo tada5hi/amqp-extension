@@ -11,7 +11,7 @@ export function buildDriverPublishOptions(
             'alias',
             'exchange',
             'queueName',
-            'data',
+            'content',
             'id',
         ],
     );
