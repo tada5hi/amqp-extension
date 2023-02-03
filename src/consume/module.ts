@@ -5,8 +5,9 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import { ConsumeMessage } from 'amqplib';
 import { merge } from 'smob';
-import { ConfigInput, getConfig } from '../config';
+import { getConfig } from '../config';
 import { useConnection } from '../connection';
 import { ExchangeOptions, buildDriverExchangeOptions, isDefaultExchange } from '../exchange';
 import { ConsumeOptions } from '../type';
@@ -19,7 +20,7 @@ export async function consume(
     options: ConsumeOptions,
     handlers: ConsumeHandlers,
 ) : Promise<void> {
-    const config : ConfigInput = getConfig(options.alias);
+    const config = getConfig(options.alias);
     const connection = await useConnection(config.alias);
     const channel = await connection.createChannel();
 
@@ -73,7 +74,7 @@ export async function consume(
         await channel.prefetch(options.prefetchCount);
     }
 
-    await channel.consume(queueName, ((async (message) => {
+    const handleMessage = async (message: ConsumeMessage | null) => {
         if (!message) {
             return;
         }
@@ -95,5 +96,11 @@ export async function consume(
         } catch (e) {
             channel.reject(message, requeueOnFailure);
         }
-    })), buildDriverConsumeOptions(options));
+    };
+
+    await channel.consume(
+        queueName,
+        (message) => handleMessage(message),
+        buildDriverConsumeOptions(options),
+    );
 }
