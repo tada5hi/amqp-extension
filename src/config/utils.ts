@@ -6,7 +6,7 @@
  */
 
 import { ExchangeType } from '../exchange';
-import { Config, ConfigInput } from './type';
+import type { Config, ConfigInput } from './type';
 
 export function getConfigKey(alias?: string) {
     return alias || 'default';

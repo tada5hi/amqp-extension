@@ -1,7 +1,7 @@
-import { Options } from 'amqplib';
+import type { Options } from 'amqplib';
 import { removeKeysFromOptions } from '../utils';
 import { ExchangeType } from './constants';
-import { ExchangeOptions } from './type';
+import type { ExchangeOptions } from './type';
 
 export function isDefaultExchange(exchange?: `${ExchangeType}`) {
     return typeof exchange === 'undefined' || exchange === ExchangeType.DEFAULT;

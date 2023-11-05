@@ -1,5 +1,5 @@
-import { Options } from 'amqplib';
-import { ConsumeOptions } from '../type';
+import type { Options } from 'amqplib';
+import type { ConsumeOptions } from '../type';
 import { removeKeysFromOptions } from '../utils';
 
 export function buildDriverConsumeOptions(

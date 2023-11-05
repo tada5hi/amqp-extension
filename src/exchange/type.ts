@@ -1,5 +1,5 @@
-import { Options } from 'amqplib';
-import { ExchangeType } from './constants';
+import type { Options } from 'amqplib';
+import type { ExchangeType } from './constants';
 
 export type ExchangeOptions = {
     name: string,

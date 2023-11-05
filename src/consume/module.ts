@@ -5,13 +5,14 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { ConsumeMessage } from 'amqplib';
+import type { ConsumeMessage } from 'amqplib';
 import { merge } from 'smob';
 import { getConfig } from '../config';
 import { useConnection } from '../connection';
-import { ExchangeOptions, buildDriverExchangeOptions, isDefaultExchange } from '../exchange';
-import { ConsumeOptions } from '../type';
-import { ConsumeHandlers } from './type';
+import type { ExchangeOptions } from '../exchange';
+import { buildDriverExchangeOptions, isDefaultExchange } from '../exchange';
+import type { ConsumeOptions } from '../type';
+import type { ConsumeHandlers } from './type';
 import { ConsumeHandlerAnyKey } from './static';
 import { buildDriverConsumeOptions } from './utils';
 

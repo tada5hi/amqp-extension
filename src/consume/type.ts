@@ -8,7 +8,7 @@
 import type {
     Channel, ConsumeMessage,
 } from 'amqplib';
-import { ConsumeHandlerAnyKey } from './static';
+import type { ConsumeHandlerAnyKey } from './static';
 
 export {
     ConsumeMessage,

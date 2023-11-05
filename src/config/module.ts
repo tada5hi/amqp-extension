@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { Config, ConfigInput } from './type';
+import type { Config, ConfigInput } from './type';
 import { extendConfig, getConfigKey } from './utils';
 
 const instances : Record<string, Config> = {};

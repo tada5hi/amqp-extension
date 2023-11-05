@@ -5,8 +5,10 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import RabbitMQ, { Connection, Options } from 'amqplib';
-import { ConfigInput, getConfig, getConfigKey } from '../config';
+import type { Connection, Options } from 'amqplib';
+import RabbitMQ from 'amqplib';
+import type { ConfigInput } from '../config';
+import { getConfig, getConfigKey } from '../config';
 
 const instances: Record<string, Connection> = {};
 

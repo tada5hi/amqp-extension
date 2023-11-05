@@ -5,9 +5,9 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { Options } from 'amqplib';
-import { ExchangeOptions } from '../exchange';
-import { ConsumeOptions, PublishOptions } from '../type';
+import type { Options } from 'amqplib';
+import type { ExchangeOptions } from '../exchange';
+import type { ConsumeOptions, PublishOptions } from '../type';
 
 export type Config = {
     alias: string,

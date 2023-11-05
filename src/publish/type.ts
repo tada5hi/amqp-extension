@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { PublishOptions } from '../type';
+import type { PublishOptions } from '../type';
 
 export type PublishOptionsExtended<T = any> = {
     /**

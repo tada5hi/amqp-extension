@@ -10,8 +10,9 @@ import { merge } from 'smob';
 import { v4 } from 'uuid';
 import { getConfig } from '../config';
 import { useConnection } from '../connection';
-import { ExchangeOptions, buildDriverExchangeOptions, isDefaultExchange } from '../exchange';
-import { PublishOptionsExtended } from './type';
+import type { ExchangeOptions } from '../exchange';
+import { buildDriverExchangeOptions, isDefaultExchange } from '../exchange';
+import type { PublishOptionsExtended } from './type';
 import { buildDriverPublishOptions } from './utils';
 
 /* istanbul ignore next */

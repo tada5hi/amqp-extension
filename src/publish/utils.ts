@@ -1,6 +1,6 @@
-import { Options } from 'amqplib';
+import type { Options } from 'amqplib';
 import { removeKeysFromOptions } from '../utils';
-import { PublishOptionsExtended } from './type';
+import type { PublishOptionsExtended } from './type';
 
 export function buildDriverPublishOptions(
     options: PublishOptionsExtended,

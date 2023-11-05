@@ -1,6 +1,6 @@
-import { Options } from 'amqplib';
-import { ConfigInput } from './config';
-import { ExchangeOptions } from './exchange';
+import type { Options } from 'amqplib';
+import type { ConfigInput } from './config';
+import type { ExchangeOptions } from './exchange';
 
 type CommonOptions = {
     /**
