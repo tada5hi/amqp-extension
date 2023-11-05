@@ -1,3 +1,10 @@
+## [2.0.1](https://github.com/Tada5hi/amqp-extension/compare/v2.0.0...v2.0.1) (2023-11-05)
+
+
+### Bug Fixes
+
+* bump (dev-) dependencies & resolved linting issues ([25b74ce](https://github.com/Tada5hi/amqp-extension/commit/25b74ceb3b83581b1f67bc7b09c6c68029e87252))
+
 # [2.0.0](https://github.com/Tada5hi/amqp-extension/compare/v1.1.1...v2.0.0) (2023-02-03)
 
 
