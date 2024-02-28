@@ -6,7 +6,7 @@
 [![Known Vulnerabilities](https://snyk.io/test/github/Tada5hi/amqp-extension/badge.svg?targetFile=package.json)](https://snyk.io/test/github/Tada5hi/amqp-extension?targetFile=package.json)
 [![semantic-release: angular](https://img.shields.io/badge/semantic--release-angular-e10079?logo=semantic-release)](https://github.com/semantic-release/semantic-release)
 
-This is a library on top of the [amqplib](https://www.npmjs.com/package/amqplib) library to simplify the process of consuming & publishing queue messages.
+This is a library on top of the [amqplib](https://www.npmjs.com/package/amqplib) library and is meant to simplify the process of consuming & publishing queue messages.
 
 **Table of Contents**
 
