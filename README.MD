@@ -2,7 +2,7 @@
 
 [![npm version](https://badge.fury.io/js/amqp-extension.svg)](https://badge.fury.io/js/amqp-extension)
 [![codecov](https://codecov.io/gh/Tada5hi/amqp-extension/branch/master/graph/badge.svg?token=6YELWNP9HG)](https://codecov.io/gh/Tada5hi/amqp-extension)
-[![Master Workflow](https://github.com/Tada5hi/amqp-extension/workflows/main/badge.svg)](https://github.com/Tada5hi/amqp-extension)
+[![Master Workflow](https://github.com/tada5hi/amqp-extension/actions/workflows/main.yml/badge.svg)](https://github.com/Tada5hi/amqp-extension)
 [![Known Vulnerabilities](https://snyk.io/test/github/Tada5hi/amqp-extension/badge.svg?targetFile=package.json)](https://snyk.io/test/github/Tada5hi/amqp-extension?targetFile=package.json)
 [![semantic-release: angular](https://img.shields.io/badge/semantic--release-angular-e10079?logo=semantic-release)](https://github.com/semantic-release/semantic-release)
 
