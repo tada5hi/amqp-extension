@@ -6,8 +6,7 @@
 [![Known Vulnerabilities](https://snyk.io/test/github/Tada5hi/amqp-extension/badge.svg?targetFile=package.json)](https://snyk.io/test/github/Tada5hi/amqp-extension?targetFile=package.json)
 [![semantic-release: angular](https://img.shields.io/badge/semantic--release-angular-e10079?logo=semantic-release)](https://github.com/semantic-release/semantic-release)
 
-This is a library on top of the famous [amqplib](https://www.npmjs.com/package/amqplib) library and defines a [message format](#message-types) for queue messages through a message broker across multiple standalone services.
-All utility functions support the usage of multiple registered connections.
+This is a library on top of the [amqplib](https://www.npmjs.com/package/amqplib) library to simplify the process of consuming & publishing queue messages.
 
 **Table of Contents**
 
@@ -35,18 +34,13 @@ npm install amqp-extension --save
 
 ### Publish to Queue
 
-The `publish` function allows you to send messages quickly.
+The `publish` method allows you to send messages quickly.
 Existing options can be added or overwritten
 
 ```typescript
-import {
-    useConnection,
-    publish,
-    setConfig
-} from "amqp-extension";
+import { Client } from "amqp-extension";
 
-// This will set the default connection :)
-setConfig({
+const client = new Client({
     connection: 'amqp://<user>:<password>@<host>',
     exchange: {
         name: '<name>',
@@ -55,7 +49,7 @@ setConfig({
 });
 
 (async () => {
-    await publish({
+    await client.publish({
         content: {
             type: 'resourceCreated',
             name: 'foo'
@@ -71,14 +65,12 @@ and as second argument and object to specify an async callback function handler 
 
 ```typescript
 import {
-    consume,
+    Client,
     ConsumeMessage,
     ConsumeOptions,
-    setConfig
 } from "amqp-extension";
 
-// This will set the default connection :)
-setConfig({
+const client = new Client({
     connection: 'amqp://<user>:<password>@<host>',
     exchange: {
         name: '<name>',
@@ -93,7 +85,7 @@ const options: ConsumeOptions = {
 }
 
 (async () => {
-    await consume(options, {
+    await client.consume(options, {
         resourceCreated: async (message: ConsumeMessage) => {
             const content = message.content.toString('utf-8');
             const payload = JSON.parse(content);
@@ -104,200 +96,7 @@ const options: ConsumeOptions = {
 })();
 ```
 
-### Multiple Connections
-
-To define multiple concurrent connections just specify a different `alias` in the configuration object, so it does not
-get overwritten.
-
-```typescript
-import {
-    ConsumeOptions,
-    publish,
-    PublishOptionsExtended,
-    setConfig
-} from "amqp-extension";
-
-// This will set the default connection :)
-setConfig({
-    connection: 'amqp://<user>:<password>@<host>',
-    exchange: {
-        name: '<name>',
-        type: 'topic'
-    }
-});
-
-setConfig({
-    alias: 'foo',
-    connection: 'amqp://<user>:<password>@<host>',
-    exchange: {
-        name: '<name>',
-        type: 'topic'
-    }
-});
-(async () => {
-    await consume(
-        {
-            routingKey: '<routing-key>',
-            alias: 'foo' // <--- use another connection :)
-        },
-        {
-            // ... handlers
-        }
-    );
-
-    await publish({
-        routingKey: '<routing-key>',
-        alias: 'foo', // <--- use another connection :)
-        content: {
-            foo: 'bar'
-        }
-    });
-})();
-
-```
-
 ## Functions
-
-### setConfig
-
-▸ `function` **setConfig**(`key?: string | ConfigInput`, `value?: ConfigInput`): `Config`
-
-Register a connection as `default` alias or specify an `<alias>` as config property.
-
-#### Example
-**`Simple`**
-
-Define the default connection config.
-
-```typescript
-import {setConfig, useConnection} from "amqp-extension";
-
-(async () => {
-    setConfig({
-        connection: 'amqp://<user>:<password>@<host>',
-        exchange: {
-            name: '<name>',
-            type: 'topic'
-        }
-    });
-
-    const connection = await useConnection();
-})();
-
-```
-
-Define a non default connection.
-
-```typescript
-import { setConfig, useConnection } from "amqp-extension";
-
-(async () => {
-    setConfig({
-        alias: '<alias>',
-        connection: 'amqp://<user>:<password>@<host>',
-        exchange: {
-            name: '<name>',
-            type: 'topic'
-        }
-    });
-
-    setConfig('foo', {
-        connection: 'amqp://<user>:<password>@<host>',
-        exchange: {
-            name: '<name>',
-            type: 'topic'
-        }
-    });
-
-    const connection = await useConnection('<alias>');
-    const fooConnection = await useConnection('foo');
-})();
-
-```
-
-
-#### Type parameters
-
-| Name  | Description |
-|:------|:------------|
-
-
-
-#### Parameters
-
-| Name    | Type                      | Description                                                |
-|:--------|:--------------------------|:-----------------------------------------------------------|
-| `key`   | `string` or `ConfigInput` | Config object or alias of config. [more](#config-types)    |
-| `value` | `Config`                  | Config object. [more](#config-types)                       |
-
-#### Returns
-
-`Config`
-
-The function returns the Config object.
-
-### useConnection
-
-▸ `function` **useConnection**(`key?: string | ConfigInput`): `Promise<Connection>`
-
-Either register a connection as `default` alias or specify an `alias` as config property.
-If you have registered a connection you can receive the connection by specifying no arguments or provide an alias name if specified.
-
-
-#### Example
-**`Simple`**
-
-Receive underlying driver connection.
-
-```typescript
-import {useConnection} from "amqp-extension";
-
-(async () => {
-    const connection = await useConnection();
-})();
-
-```
-
-**`Advanced`**
-
-Use a none `default` connection.
-
-```typescript
-import {setConfig, useConnection} from "amqp-extension";
-
-(async () => {
-    setConfig({
-        alias: '<alias>',
-        connection: 'amqp://<user>:<password>@<host>',
-        exchange: {
-            name: '<name>',
-            type: 'topic'
-        }
-    });
-
-    const connection = await useConnection('<alias>');
-})();
-
-```
-
-#### Type parameters
-
-| Name  | Description   |
-|:------|:--------------|
-
-
-
-#### Parameters
-
-| Name  | Type                 | Description                                      |
-|:------|:---------------------|:-------------------------------------------------|
-| `key` | `string` or `Config` | Config or alias of config. [more](#config-types) |
-
-#### Returns
-
-`Promise<Connection>`
-
-The function returns the Connection object of the `amqplib`.
 
 ### publish
 
@@ -309,12 +108,14 @@ As second parameter a registered config can be used by specifying the alias or p
 **`Simple`**
 
 ```typescript
-import {
-    publish
-} from "amqp-extension";
+import { Client } from "amqp-extension";
+
+const client = new Client({
+    // ...
+});
 
 (async () => {
-    await publish({
+    await client.publish({
         content: {
             type: 'resourceCreated'
         }
@@ -351,17 +152,21 @@ As second parameter a registered config can be used by specifying the alias or p
 
 ```typescript
 import {
-    consume,
+    Client,
     ConsumeOptions,
     ConsumeMessage,
 } from "amqp-extension";
+
+const client = new Client({
+    // ...
+});
 
 const options: ConsumeOptions = {
     routingKey: '<routing-key>'
 }
 
 (async () => {
-    await consume(options, {
+    await client.consume(options, {
         '<type>': async (message: ConsumeMessage) => {
             // do some async action :)
         }
@@ -400,7 +205,6 @@ import { ExchangeOptions } from '../exchange';
 import { ConsumeOptions, PublishOptions } from '../type';
 
 export type Config = {
-    alias: string,
     connection: Options.Connect | string,
     exchange: ExchangeOptions,
     publish: PublishOptions,

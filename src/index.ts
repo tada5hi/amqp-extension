@@ -7,7 +7,7 @@
 
 export * from './config';
 export * from './consume';
-export * from './connection';
 export * from './exchange';
+export * from './module';
 export * from './publish';
 export * from './type';

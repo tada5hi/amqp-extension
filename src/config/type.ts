@@ -10,7 +10,6 @@ import type { ExchangeOptions } from '../exchange';
 import type { ConsumeOptions, PublishOptions } from '../type';
 
 export type Config = {
-    alias: string,
     connection: Options.Connect | string,
     exchange: ExchangeOptions,
     publish: PublishOptions,
