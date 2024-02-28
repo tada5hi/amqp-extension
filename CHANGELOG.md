@@ -1,3 +1,20 @@
+# [3.0.0](https://github.com/Tada5hi/amqp-extension/compare/v2.0.2...v3.0.0) (2024-02-28)
+
+
+### Bug Fixes
+
+* **deps:** bump @types/amqplib from 0.10.4 to 0.10.5 ([#310](https://github.com/Tada5hi/amqp-extension/issues/310)) ([984294e](https://github.com/Tada5hi/amqp-extension/commit/984294e7ac9dd04853ebd75e70b09841340b3239))
+
+
+### Features
+
+* bind consume & publish to client class & remove singleton patterns ([9160408](https://github.com/Tada5hi/amqp-extension/commit/9160408038b1d48210735c843674817bb0ac45c6))
+
+
+### BREAKING CHANGES
+
+* refactor public api
+
 ## [2.0.2](https://github.com/Tada5hi/amqp-extension/compare/v2.0.1...v2.0.2) (2024-02-28)
 
 
