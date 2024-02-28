@@ -1,6 +1,6 @@
 {
     "name": "amqp-extension",
-    "version": "2.0.1",
+    "version": "2.0.2",
     "description": "An amqp extension with functions and utility functions to consume and publish queue messages.",
     "main": "./dist/index.js",
     "typings": "dist/index.d.ts",

@@ -1,3 +1,10 @@
+## [2.0.2](https://github.com/Tada5hi/amqp-extension/compare/v2.0.1...v2.0.2) (2024-02-28)
+
+
+### Bug Fixes
+
+* **deps:** bump @types/amqplib from 0.10.3 to 0.10.4 ([#264](https://github.com/Tada5hi/amqp-extension/issues/264)) ([fb85e39](https://github.com/Tada5hi/amqp-extension/commit/fb85e39317d9b1bc2e08452f70bde7ea48957bef))
+
 ## [2.0.1](https://github.com/Tada5hi/amqp-extension/compare/v2.0.0...v2.0.1) (2023-11-05)
 
 
