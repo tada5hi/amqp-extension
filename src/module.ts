@@ -18,14 +18,47 @@ import { buildDriverExchangeOptions, isDefaultExchange } from './exchange';
 import type { PublishOptionsExtended } from './publish';
 import { buildDriverPublishOptions } from './publish';
 import type { ConsumeOptions } from './type';
+import { wait } from './utils';
+
+type Consumer = {
+    options: ConsumeOptions,
+    handlers: ConsumeHandlers,
+};
 
 export class Client {
     protected connection: Connection | undefined;
 
     protected config : Config;
 
+    protected reconnectAttempts: number;
+
+    protected consumers : Consumer[];
+
     constructor(options: ConfigInput) {
         this.config = buildConfig(options);
+        this.reconnectAttempts = 0;
+        this.consumers = [];
+    }
+
+    protected async createConnection() : Promise<Connection> {
+        let connection : Connection;
+
+        try {
+            connection = await connect(this.config.connection);
+            this.reconnectAttempts = 0;
+        } catch (e) {
+            if (this.reconnectAttempts < this.config.reconnectAttempts) {
+                this.reconnectAttempts++;
+
+                await wait(this.config.reconnectTimeout);
+
+                return this.createConnection();
+            }
+
+            throw e;
+        }
+
+        return connection;
     }
 
     async useConnection() : Promise<Connection> {
@@ -33,8 +66,25 @@ export class Client {
             return this.connection;
         }
 
-        this.connection = await connect(this.config.connection);
+        const connection = await this.createConnection();
+        const handleDisconnect = async () => {
+            this.connection = await this.createConnection();
+
+            await this.recreateConsumers();
+        };
+
+        connection.once('close', handleDisconnect);
+        connection.once('error', handleDisconnect);
+
+        this.connection = connection;
+
         return this.connection;
+    }
+
+    protected async recreateConsumers() {
+        for (let i = 0; i < this.consumers.length; i++) {
+            await this.consume(this.consumers[i].options, this.consumers[i].handlers);
+        }
     }
 
     async consume(
@@ -123,6 +173,11 @@ export class Client {
             (message) => handleMessage(message),
             buildDriverConsumeOptions(options),
         );
+
+        this.consumers.push({
+            options,
+            handlers,
+        });
     }
 
     async publish(options: PublishOptionsExtended) {
