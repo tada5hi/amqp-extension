@@ -6,7 +6,7 @@
     "typings": "dist/index.d.ts",
     "scripts": {
         "build": "rm -rf ./dist && tsc",
-        "test": "cross-env NODE_ENV=test jest --config ./test/jest.config.js",
+        "test": "cross-env NODE_ENV=test jest --config ./test/jest.config.js --detectOpenHandles",
         "test:coverage": "cross-env NODE_ENV=test jest --config ./test/jest.config.js --coverage",
         "lint": "eslint --ext .js,.vue,.ts ./src",
         "lint:fix": "npm run lint -- --fix",
@@ -49,10 +49,12 @@
         "@types/node": "^20.8.10",
         "@types/uuid": "^9.0.8",
         "cross-env": "^7.0.3",
+        "envix": "^1.5.0",
         "eslint": "^8.57.0",
         "husky": "^8.0.3",
         "jest": "^29.7.0",
         "semantic-release": "^22.0.7",
+        "testcontainers": "^10.7.2",
         "ts-jest": "^29.1.2",
         "typescript": "^5.2.2"
     }

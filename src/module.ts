@@ -5,6 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import process from 'node:process';
 import type { Connection, ConsumeMessage } from 'amqplib';
 import { connect } from 'amqplib';
 import { merge } from 'smob';
@@ -38,6 +39,12 @@ export class Client {
         this.config = buildConfig(options);
         this.reconnectAttempts = 0;
         this.consumers = [];
+
+        process.once('SIGINT', async () => {
+            if (this.connection) {
+                await this.connection.close();
+            }
+        });
     }
 
     protected async createConnection() : Promise<Connection> {
@@ -67,7 +74,9 @@ export class Client {
         }
 
         const connection = await this.createConnection();
-        const handleDisconnect = async () => {
+        const handleDisconnect = async (err?: Error | null) => {
+            if (!err) return;
+
             this.connection = await this.createConnection();
 
             await this.recreateConsumers();
@@ -180,7 +189,7 @@ export class Client {
         });
     }
 
-    async publish(options: PublishOptionsExtended) {
+    async publish(options: PublishOptionsExtended) : Promise<boolean> {
         let buffer : Buffer;
 
         if (Buffer.isBuffer(options.content)) {
@@ -225,7 +234,7 @@ export class Client {
                 throw new Error('The routingKey can not be empty if a non default exchange is selected.');
             }
 
-            channel.publish(
+            return channel.publish(
                 this.config.exchange.name,
                 exchangeOptions.routingKey,
                 buffer,
@@ -234,8 +243,6 @@ export class Client {
                     ...options,
                 }),
             );
-
-            return;
         }
 
         // publish to default exchange
@@ -250,7 +257,7 @@ export class Client {
             durable: true,
         });
 
-        channel.sendToQueue(queueName, buffer, buildDriverPublishOptions({
+        return channel.sendToQueue(queueName, buffer, buildDriverPublishOptions({
             persistent: true,
             ...options,
         }));

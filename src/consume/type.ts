@@ -14,7 +14,11 @@ export {
     ConsumeMessage,
 };
 
-export type ConsumeMessageHandler = (message: ConsumeMessage, channel: Channel) => Promise<void>;
+export type ConsumeMessageHandler = (message: ConsumeMessage, channel: Channel) => Promise<void> | void;
 export type ConsumeHandlerAnyKeyType = typeof ConsumeHandlerAnyKey;
 
-export type ConsumeHandlers = Record<ConsumeHandlerAnyKeyType | string, ConsumeMessageHandler>;
+export type ConsumeHandlers = {
+    [ConsumeHandlerAnyKey]?: ConsumeMessageHandler,
+} & {
+    [key:string] : ConsumeMessageHandler
+};
