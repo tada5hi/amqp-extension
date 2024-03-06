@@ -1,3 +1,11 @@
+# [3.1.0](https://github.com/Tada5hi/amqp-extension/compare/v3.0.0...v3.1.0) (2024-03-06)
+
+
+### Features
+
+* reconnect strategy ([#320](https://github.com/Tada5hi/amqp-extension/issues/320)) ([4c31551](https://github.com/Tada5hi/amqp-extension/commit/4c31551029916dcaf055f78d53a8af7c626c393d))
+* reconnect strategy ([#320](https://github.com/Tada5hi/amqp-extension/issues/320)) ([17b141f](https://github.com/Tada5hi/amqp-extension/commit/17b141f6bd6256172e8c03a1006bfc1cab6225eb))
+
 # [3.0.0](https://github.com/Tada5hi/amqp-extension/compare/v2.0.2...v3.0.0) (2024-02-28)
 
 
