@@ -20,6 +20,11 @@ import { buildDriverPublishOptions } from './publish';
 import type { ConsumeOptions } from './type';
 import { wait } from './utils';
 
+type Consumer = {
+    options: ConsumeOptions,
+    handlers: ConsumeHandlers,
+};
+
 export class Client {
     protected connection: Connection | undefined;
 
@@ -27,10 +32,12 @@ export class Client {
 
     protected reconnectAttempts: number;
 
+    protected consumers : Consumer[];
+
     constructor(options: ConfigInput) {
         this.config = buildConfig(options);
-
         this.reconnectAttempts = 0;
+        this.consumers = [];
     }
 
     protected async createConnection() : Promise<Connection> {
@@ -38,6 +45,7 @@ export class Client {
 
         try {
             connection = await connect(this.config.connection);
+            this.reconnectAttempts = 0;
         } catch (e) {
             if (this.reconnectAttempts < this.config.reconnectAttempts) {
                 this.reconnectAttempts++;
@@ -61,6 +69,8 @@ export class Client {
         const connection = await this.createConnection();
         const handleDisconnect = async () => {
             this.connection = await this.createConnection();
+
+            await this.recreateConsumers();
         };
 
         connection.once('close', handleDisconnect);
@@ -69,6 +79,12 @@ export class Client {
         this.connection = connection;
 
         return this.connection;
+    }
+
+    protected async recreateConsumers() {
+        for (let i = 0; i < this.consumers.length; i++) {
+            await this.consume(this.consumers[i].options, this.consumers[i].handlers);
+        }
     }
 
     async consume(
@@ -157,6 +173,11 @@ export class Client {
             (message) => handleMessage(message),
             buildDriverConsumeOptions(options),
         );
+
+        this.consumers.push({
+            options,
+            handlers,
+        });
     }
 
     async publish(options: PublishOptionsExtended) {
