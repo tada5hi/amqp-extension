@@ -10,6 +10,8 @@ import type { Config, ConfigInput } from './type';
 
 export function buildConfig(input: ConfigInput) : Config {
     return {
+        reconnectAttempts: 10,
+        reconnectTimeout: 1000,
         connection: input.connection,
         publish: input.publish || {},
         consume: input.consume || {},

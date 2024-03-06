@@ -18,14 +18,39 @@ import { buildDriverExchangeOptions, isDefaultExchange } from './exchange';
 import type { PublishOptionsExtended } from './publish';
 import { buildDriverPublishOptions } from './publish';
 import type { ConsumeOptions } from './type';
+import { wait } from './utils';
 
 export class Client {
     protected connection: Connection | undefined;
 
     protected config : Config;
 
+    protected reconnectAttempts: number;
+
     constructor(options: ConfigInput) {
         this.config = buildConfig(options);
+
+        this.reconnectAttempts = 0;
+    }
+
+    protected async createConnection() : Promise<Connection> {
+        let connection : Connection;
+
+        try {
+            connection = await connect(this.config.connection);
+        } catch (e) {
+            if (this.reconnectAttempts < this.config.reconnectAttempts) {
+                this.reconnectAttempts++;
+
+                await wait(this.config.reconnectTimeout);
+
+                return this.createConnection();
+            }
+
+            throw e;
+        }
+
+        return connection;
     }
 
     async useConnection() : Promise<Connection> {
@@ -33,7 +58,16 @@ export class Client {
             return this.connection;
         }
 
-        this.connection = await connect(this.config.connection);
+        const connection = await this.createConnection();
+        const handleDisconnect = async () => {
+            this.connection = await this.createConnection();
+        };
+
+        connection.once('close', handleDisconnect);
+        connection.once('error', handleDisconnect);
+
+        this.connection = connection;
+
         return this.connection;
     }
 

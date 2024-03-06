@@ -16,3 +16,11 @@ export function removeKeysFromOptions<
 
     return options as Omit<T, K[number]>;
 }
+
+export async function wait(ms: number) {
+    return new Promise<void>((resolve) => {
+        setTimeout(() => {
+            resolve();
+        }, ms);
+    });
+}
