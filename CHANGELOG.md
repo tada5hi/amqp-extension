@@ -1,3 +1,10 @@
+## [3.1.1](https://github.com/Tada5hi/amqp-extension/compare/v3.1.0...v3.1.1) (2024-03-07)
+
+
+### Bug Fixes
+
+* don't register consumer multiple times ([b45defa](https://github.com/Tada5hi/amqp-extension/commit/b45defa4dbd5a7abf6d2568586e2ff5bf2e62d16))
+
 # [3.1.0](https://github.com/Tada5hi/amqp-extension/compare/v3.0.0...v3.1.0) (2024-03-06)
 
 
