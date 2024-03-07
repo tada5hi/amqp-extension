@@ -6,7 +6,7 @@
  */
 
 import process from 'node:process';
-import type { Connection, ConsumeMessage } from 'amqplib';
+import type { Channel, Connection, ConsumeMessage } from 'amqplib';
 import { connect } from 'amqplib';
 import { merge } from 'smob';
 import { v4 } from 'uuid';
@@ -92,14 +92,14 @@ export class Client {
 
     protected async recreateConsumers() {
         for (let i = 0; i < this.consumers.length; i++) {
-            await this.consume(this.consumers[i].options, this.consumers[i].handlers);
+            await this.createConsumer(this.consumers[i].options, this.consumers[i].handlers);
         }
     }
 
-    async consume(
+    protected async createConsumer(
         options: ConsumeOptions,
         handlers: ConsumeHandlers,
-    ) : Promise<void> {
+    ) : Promise<Channel> {
         const connection = await this.useConnection();
         const channel = await connection.createChannel();
 
@@ -182,6 +182,15 @@ export class Client {
             (message) => handleMessage(message),
             buildDriverConsumeOptions(options),
         );
+
+        return channel;
+    }
+
+    async consume(
+        options: ConsumeOptions,
+        handlers: ConsumeHandlers,
+    ) : Promise<void> {
+        await this.createConsumer(options, handlers);
 
         this.consumers.push({
             options,
