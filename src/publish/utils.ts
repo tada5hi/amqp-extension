@@ -8,7 +8,6 @@ export function buildDriverPublishOptions(
     return removeKeysFromOptions(
         { ...options },
         [
-            'alias',
             'exchange',
             'queueName',
             'content',

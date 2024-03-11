@@ -8,7 +8,6 @@ export function buildDriverConsumeOptions(
     return removeKeysFromOptions(
         { ...options },
         [
-            'alias',
             'exchange',
             'queueName',
             'requeueOnFailure',
