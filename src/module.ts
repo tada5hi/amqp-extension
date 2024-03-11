@@ -243,7 +243,7 @@ export class Client {
                 throw new Error('The routingKey can not be empty if a non default exchange is selected.');
             }
 
-            return channel.publish(
+            const published = channel.publish(
                 this.config.exchange.name,
                 exchangeOptions.routingKey,
                 buffer,
@@ -252,6 +252,10 @@ export class Client {
                     ...options,
                 }),
             );
+
+            await channel.close();
+
+            return published;
         }
 
         // publish to default exchange
@@ -266,9 +270,13 @@ export class Client {
             durable: true,
         });
 
-        return channel.sendToQueue(queueName, buffer, buildDriverPublishOptions({
+        const published = channel.sendToQueue(queueName, buffer, buildDriverPublishOptions({
             persistent: true,
             ...options,
         }));
+
+        await channel.close();
+
+        return published;
     }
 }
