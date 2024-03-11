@@ -1,3 +1,15 @@
+# [3.2.0](https://github.com/Tada5hi/amqp-extension/compare/v3.1.1...v3.2.0) (2024-03-11)
+
+
+### Bug Fixes
+
+* remove unnecessary alias option ([8027d0a](https://github.com/Tada5hi/amqp-extension/commit/8027d0afb2063e5d0387dacf26cd77444dc933e4))
+
+
+### Features
+
+* allways close channel after publishing ([a9b300f](https://github.com/Tada5hi/amqp-extension/commit/a9b300f6ab64d176a656cf9fc485f31a36168a7f))
+
 ## [3.1.1](https://github.com/Tada5hi/amqp-extension/compare/v3.1.0...v3.1.1) (2024-03-07)
 
 
