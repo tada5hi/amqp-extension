@@ -1,3 +1,10 @@
+# [3.3.0](https://github.com/Tada5hi/amqp-extension/compare/v3.2.0...v3.3.0) (2024-03-20)
+
+
+### Features
+
+* use amqp-connection-manager for connection/reconnect buisness ([#331](https://github.com/Tada5hi/amqp-extension/issues/331)) ([aa6a21e](https://github.com/Tada5hi/amqp-extension/commit/aa6a21e391ad2c07aa645ec2241e47b177e825e9))
+
 # [3.2.0](https://github.com/Tada5hi/amqp-extension/compare/v3.1.1...v3.2.0) (2024-03-11)
 
 
