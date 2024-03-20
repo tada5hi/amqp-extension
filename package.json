@@ -36,6 +36,7 @@
     "homepage": "https://github.com/Tada5hi/amqp-extension#readme",
     "dependencies": {
         "@types/amqplib": "^0.10.5",
+        "amqp-connection-manager": "^4.1.14",
         "amqplib": "^0.10.3",
         "smob": "^1.4.1",
         "uuid": "^9.0.1"

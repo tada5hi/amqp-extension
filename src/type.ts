@@ -1,5 +1,8 @@
+import type { connect } from 'amqp-connection-manager';
 import type { Options } from 'amqplib';
 import type { ExchangeOptions } from './exchange';
+
+export type Connection = ReturnType<typeof connect>;
 
 type CommonOptions = {
     /**
