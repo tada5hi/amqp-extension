@@ -60,6 +60,30 @@ export class Client {
 
         let queueName : string = options.queueName || this.config.publish.queueName || '';
 
+        const requeueOnFailure : boolean = this.config.consume.requeueOnFailure ?? false;
+
+        const handleMessage = async (message: ConsumeMessage | null) => {
+            if (!message) {
+                return;
+            }
+
+            const handler = handlers[message.properties.type] ||
+                handlers[ConsumeHandlerAnyKey];
+
+            if (typeof handler === 'undefined') {
+                channel.nack(message, undefined, requeueOnFailure);
+                return;
+            }
+
+            try {
+                await handler(message, channel);
+
+                channel.ack(message);
+            } catch (e) {
+                channel.nack(message);
+            }
+        };
+
         const connection = this.useConnection();
         const channel = connection.createChannel({
             setup: async (channel: Channel) => {
@@ -99,31 +123,20 @@ export class Client {
 
                     queueName = assertionQueue.queue;
                 }
+
+                if (typeof options.prefetchCount !== 'undefined') {
+                    await channel.prefetch(options.prefetchCount);
+                }
+
+                await channel.consume(
+                    queueName,
+                    (message) => handleMessage(message),
+                    buildDriverConsumeOptions(options),
+                );
             },
         });
 
-        const handleMessage = async (message: ConsumeMessage | null) => {
-            if (!message) {
-                return;
-            }
-
-            const handler = handlers[message.properties.type] ||
-                handlers[ConsumeHandlerAnyKey];
-
-            if (typeof handler === 'undefined') {
-                return;
-            }
-
-            await handler(message, channel);
-
-            channel.ack(message);
-        };
-
-        await channel.consume(
-            queueName,
-            (message) => handleMessage(message),
-            buildDriverConsumeOptions(options),
-        );
+        return channel.waitForConnect();
     }
 
     async publish(options: PublishOptionsExtended) : Promise<boolean> {
@@ -187,7 +200,7 @@ export class Client {
                 throw new Error('The routingKey can not be empty if a non default exchange is selected.');
             }
 
-            const published = channel.publish(
+            const published = await channel.publish(
                 this.config.exchange.name,
                 exchangeOptions.routingKey,
                 buffer,
@@ -206,7 +219,7 @@ export class Client {
             throw new Error('The queue name can not be empty if a non default exchange is selected.');
         }
 
-        const published = channel.sendToQueue(queueName, buffer, buildDriverPublishOptions({
+        const published = await channel.sendToQueue(queueName, buffer, buildDriverPublishOptions({
             persistent: true,
             ...options,
         }));
