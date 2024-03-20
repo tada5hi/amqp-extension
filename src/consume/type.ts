@@ -5,8 +5,9 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import type { ChannelWrapper } from 'amqp-connection-manager';
 import type {
-    Channel, ConsumeMessage,
+    ConsumeMessage,
 } from 'amqplib';
 import type { ConsumeHandlerAnyKey } from './static';
 
@@ -14,7 +15,7 @@ export {
     ConsumeMessage,
 };
 
-export type ConsumeMessageHandler = (message: ConsumeMessage, channel: Channel) => Promise<void> | void;
+export type ConsumeMessageHandler = (message: ConsumeMessage, channel: ChannelWrapper) => Promise<void> | void;
 export type ConsumeHandlerAnyKeyType = typeof ConsumeHandlerAnyKey;
 
 export type ConsumeHandlers = {
