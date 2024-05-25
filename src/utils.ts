@@ -1,30 +1,5 @@
-import { createMerger, hasOwnProperty } from 'smob';
-import { isExchangeOptions } from './exchange';
-
-export function removeKeysFromOptions<
-    T extends Record<string, any>,
-    K extends(
-        keyof T)[],
-    >(
-    options: T,
-    keys: K,
-) : Omit<T, K[number]> {
-    for (let i = 0; i < keys.length; i++) {
-        if (hasOwnProperty(options, keys[i])) {
-            delete options[keys[i]];
-        }
-    }
-
-    return options as Omit<T, K[number]>;
-}
-
-export async function wait(ms: number) {
-    return new Promise<void>((resolve) => {
-        setTimeout(() => {
-            resolve();
-        }, ms);
-    });
-}
+import { createMerger } from 'smob';
+import { isExchange } from './exchange';
 
 const mergeOptions = createMerger({
     priority: 'left',
@@ -38,8 +13,8 @@ const mergeOptions = createMerger({
         }
 
         if (
-            !isExchangeOptions(target[key]) ||
-            !isExchangeOptions(value)
+            !isExchange(target[key]) ||
+            !isExchange(value)
         ) {
             return undefined;
         }

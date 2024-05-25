@@ -1,17 +1,17 @@
-import type { Options } from 'amqplib';
-import type { ConsumeOptions } from '../type';
-import { removeKeysFromOptions } from '../utils';
+import { isObject } from 'smob';
+import type { ConsumeHandlers } from './type';
 
-export function buildDriverConsumeOptions(
-    options: ConsumeOptions,
-) : Options.Consume {
-    return removeKeysFromOptions(
-        { ...options },
-        [
-            'exchange',
-            'queueName',
-            'requeueOnFailure',
-            'prefetchCount',
-        ],
-    );
+export function isConsumeHandlers(input: unknown) : input is ConsumeHandlers {
+    if (!isObject(input)) {
+        return false;
+    }
+
+    const keys = Object.keys(input);
+    for (let i = 0; i < keys.length; i++) {
+        if (typeof input[keys[i]] !== 'function') {
+            return false;
+        }
+    }
+
+    return true;
 }

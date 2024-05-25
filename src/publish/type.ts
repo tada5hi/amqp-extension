@@ -5,18 +5,11 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { PublishOptions } from '../type';
+import type { Options } from 'amqplib';
 
-export type PublishOptionsExtended<T = any> = {
-    /**
-     * Alias for: messageId
-     *
-     * Default: <generated uuid>
-     */
-    id?: string;
-
-    /**
-     * The message data.
-     */
-    content: T,
-} & PublishOptions;
+export type PublishOptions = Options.Publish;
+export type PublishContext = {
+    to: string,
+    data: any,
+    options?: PublishOptions,
+};

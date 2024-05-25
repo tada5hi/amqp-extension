@@ -13,48 +13,34 @@ describe('src/module', () => {
     let client: Client;
 
     beforeAll(async () => {
-        const connection = read('MQ_CONNECTION_STRING', '');
+        const connectionOptions = read('MQ_CONNECTION_STRING', '');
         client = new Client({
-            connection
+            connectionOptions
         })
     })
 
     afterAll(async () => {
-        const connection = await client.useConnection();
-        await connection.close();
+        await client.connection.close();
 
         // @ts-ignore
         client = undefined;
     })
 
-    it('should establish connection', async () => {
-        const connection = await client.useConnection();
-        expect(connection).toBeDefined();
-    });
-
     it('should publish message', async () => {
-        const published = await client.publish({
-            content: 'foo',
-            exchange: {
-                type: 'topic',
-                name: 'test',
-                routingKey: 'foo'
-            }
-        });
+        const published = await client.publish('foo', 'foo')
 
         expect(published).toBeTruthy();
     });
 
-    it('should publish and subscribe (topic)',  (done) => {
+    it('should publish and subscribe to topic exchange',  (done) => {
+        const topicExchange = client.of({
+            type: 'topic',
+            name: 'test'
+        });
+
         Promise.resolve()
             .then(() => {
-                return client.consume({
-                    exchange: {
-                        type: 'topic',
-                        name: 'test',
-                        routingKey: 'foo'
-                    }
-                }, {
+                return topicExchange.consume('foo', {
                     $any: (message) => {
                         const content = message.content.toString();
                         expect(content).toEqual('fooBar')
@@ -62,28 +48,14 @@ describe('src/module', () => {
                     }
                 });
             }).then(() => {
-                client.publish({
-                    content: 'fooBar',
-                    exchange: {
-                        type: 'topic',
-                        name: 'test',
-                        routingKey: 'foo'
-                    }
-                });
+            topicExchange.publish('foo', 'fooBar');
             })
     });
 
-    it('should publish and subscribe (direct)',  (done) => {
+    it('should publish and subscribe to direct exchange',  (done) => {
         Promise.resolve()
             .then(() => {
-                return client.consume({
-                    exchange: {
-                        type: 'direct',
-                        name: '',
-                        routingKey: 'logs'
-                    },
-                    noAck: false
-                }, {
+                return client.consume('logs', {
                     $any: (message, channel) => {
                         const content = message.content.toString();
                         expect(content).toEqual('fooBar');
@@ -94,14 +66,7 @@ describe('src/module', () => {
                     }
                 });
             }).then(() => {
-                return client.publish({
-                    content: 'fooBar',
-                    exchange: {
-                        type: 'direct',
-                        name: '',
-                        routingKey: 'logs'
-                    }
-                })
+                return client.publish('logs', 'fooBar')
               })
     })
 })

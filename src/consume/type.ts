@@ -6,9 +6,7 @@
  */
 
 import type { ChannelWrapper } from 'amqp-connection-manager';
-import type {
-    ConsumeMessage,
-} from 'amqplib';
+import type { ConsumeMessage, Options } from 'amqplib';
 import type { ConsumeHandlerAnyKey } from './static';
 
 export {
@@ -22,4 +20,22 @@ export type ConsumeHandlers = {
     [ConsumeHandlerAnyKey]?: ConsumeMessageHandler,
 } & {
     [key:string] : ConsumeMessageHandler
+};
+
+export type ConsumeOptions = Options.Consume & {
+    /**
+     * Default: false
+     */
+    requeueOnFailure?: boolean;
+
+    /**
+     * Default: undefined
+     */
+    prefetchCount?: number
+};
+
+export type ConsumeContext = {
+    from: string,
+    options?: ConsumeOptions,
+    handlers: ConsumeHandlers
 };

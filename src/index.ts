@@ -11,3 +11,7 @@ export * from './exchange';
 export * from './module';
 export * from './publish';
 export * from './type';
+export { PublishContext } from './publish';
+export { PublishOptions } from './publish';
+export { ConsumeContext } from './consume';
+export { ConsumeOptions } from './consume';

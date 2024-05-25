@@ -6,14 +6,15 @@
  */
 
 import type { Options } from 'amqplib';
-import type { ExchangeOptions } from '../exchange';
-import type { ConsumeOptions, PublishOptions } from '../type';
+import type { ConsumeOptions } from '../consume';
+import type { Exchange } from '../exchange';
+import type { PublishOptions } from '../publish';
 
 export type Config = {
     reconnectAttempts: number,
     reconnectTimeout: number,
     connection: Options.Connect | string,
-    exchange: ExchangeOptions,
+    exchange: Exchange,
     publish: PublishOptions,
     consume: ConsumeOptions
 };

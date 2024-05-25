@@ -8,56 +8,98 @@
 import { connect } from 'amqp-connection-manager';
 import type { Channel, ConsumeMessage } from 'amqplib';
 import process from 'node:process';
-import type { Connection, ConsumeOptions } from './type';
-import type { Config, ConfigInput } from './config';
-import { buildConfig } from './config';
-import type { ConsumeHandlers } from './consume';
-import { ConsumeHandlerAnyKey, buildDriverConsumeOptions } from './consume';
-import { ExchangeType, buildDriverExchangeOptions, isDefaultExchange } from './exchange';
-import type { PublishOptionsExtended } from './publish';
-import { buildDriverPublishOptions } from './publish';
+import type { PublishContext, PublishOptions } from './publish';
+import type {
+    ClientContext,
+    Connection,
+
+} from './type';
+import type { ConsumeContext, ConsumeHandlers, ConsumeOptions } from './consume';
+import { ConsumeHandlerAnyKey, isConsumeHandlers } from './consume';
+import type { Exchange } from './exchange';
+import {
+    ExchangeType, isDefaultExchange,
+} from './exchange';
 import { mergeOptions } from './utils';
 
 export class Client {
-    protected connection: Connection | undefined;
+    public readonly connection: Connection;
 
-    protected config : Config;
+    protected publishOptions : PublishOptions;
 
-    constructor(options: ConfigInput) {
-        this.config = buildConfig(options);
+    protected consumeOptions : ConsumeOptions;
 
-        process.once('SIGINT', async () => {
-            if (this.connection) {
-                await this.connection.close();
-            }
-        });
-    }
+    protected exchange: Exchange;
 
-    useConnection() : Connection {
-        if (typeof this.connection !== 'undefined') {
-            return this.connection;
+    constructor(ctx: ClientContext) {
+        if (ctx.connection) {
+            this.connection = ctx.connection;
+        } else {
+            this.connection = connect(ctx.connectionOptions, {
+                reconnectTimeInSeconds: 60,
+            });
+
+            process.once('SIGINT', async () => {
+                if (this.connection) {
+                    await this.connection.close();
+                }
+            });
         }
 
-        this.connection = connect(this.config.connection, {
-            reconnectTimeInSeconds: this.config.reconnectTimeout,
-        });
-
-        return this.connection;
+        this.publishOptions = ctx.publishOptions || {};
+        this.consumeOptions = ctx.consumeOptions || {};
+        this.exchange = ctx.exchange || {
+            type: ExchangeType.DIRECT,
+            name: '',
+        };
     }
 
-    async consume(
-        options: ConsumeOptions,
-        handlers: ConsumeHandlers,
-    ) : Promise<void> {
-        const consumeOptions = mergeOptions(
-            options,
-            {
-                exchange: this.config.exchange || {},
-            },
-            this.config.consume,
-        );
+    of(exchange: Exchange) : Client {
+        return new Client({
+            connection: this.connection,
+            publishOptions: this.publishOptions,
+            consumeOptions: this.consumeOptions,
+            exchange,
+        });
+    }
 
-        const requeueOnFailure = consumeOptions.requeueOnFailure ?? false;
+    async consume(ctx: ConsumeContext) : Promise<void>;
+
+    async consume(from: string, handlers: ConsumeHandlers): Promise<void>;
+
+    async consume(from: string, options: ConsumeOptions, handlers: ConsumeHandlers): Promise<void>;
+
+    async consume(
+        _ctxOrFrom: ConsumeContext | string,
+        _optionsOrHandlers?: ConsumeOptions | ConsumeHandlers,
+        _handlers?: ConsumeHandlers,
+    ) : Promise<void> {
+        let from : string;
+        let handlers: ConsumeHandlers;
+        let options: ConsumeOptions;
+
+        if (typeof _ctxOrFrom === 'string') {
+            from = _ctxOrFrom;
+
+            if (isConsumeHandlers(_optionsOrHandlers)) {
+                handlers = _optionsOrHandlers;
+                options = this.consumeOptions;
+            } else {
+                handlers = _handlers as ConsumeHandlers;
+                options = mergeOptions(_optionsOrHandlers as ConsumeOptions, this.consumeOptions);
+            }
+        } else {
+            from = _ctxOrFrom.from;
+            handlers = _ctxOrFrom.handlers;
+
+            if (_ctxOrFrom.options) {
+                options = mergeOptions(_ctxOrFrom.options, this.consumeOptions);
+            } else {
+                options = this.consumeOptions;
+            }
+        }
+
+        const requeueOnFailure = options.requeueOnFailure ?? false;
         const handleMessage = async (message: ConsumeMessage | null) => {
             if (!message) {
                 return;
@@ -80,11 +122,10 @@ export class Client {
             }
         };
 
-        const connection = this.useConnection();
-        const channel = connection.createChannel({
+        const channel = this.connection.createChannel({
             setup: async (channel: Channel) => {
-                let queueName = consumeOptions.queueName || consumeOptions.exchange.routingKey || '';
-                if (isDefaultExchange(consumeOptions.exchange.type)) {
+                let queueName = from;
+                if (isDefaultExchange(this.exchange.type)) {
                     if (queueName === '') {
                         throw new Error('The queue name can not be empty if the default exchange is selected.');
                     }
@@ -94,37 +135,37 @@ export class Client {
                     });
                 } else {
                     await channel.assertExchange(
-                        consumeOptions.exchange.name,
-                        consumeOptions.exchange.type || ExchangeType.TOPIC,
-                        buildDriverExchangeOptions({
-                            durable: true,
-                            ...consumeOptions.exchange,
-                        }),
+                        this.exchange.name || '',
+                        this.exchange.type,
+                        this.exchange.options,
                     );
 
-                    const assertionQueue = await channel.assertQueue('', {
-                        durable: false,
-                        autoDelete: true,
-                        exclusive: true,
-                    });
+                    const assertionQueue = await channel.assertQueue(
+                        '',
+                        {
+                            durable: false,
+                            autoDelete: true,
+                            exclusive: true,
+                        },
+                    );
 
                     await channel.bindQueue(
                         assertionQueue.queue,
-                        consumeOptions.exchange.name,
-                        consumeOptions.exchange.routingKey || '',
+                        this.exchange.name || '',
+                        from || '',
                     );
 
                     queueName = assertionQueue.queue;
                 }
 
-                if (typeof consumeOptions.prefetchCount === 'number') {
-                    await channel.prefetch(consumeOptions.prefetchCount);
+                if (typeof options.prefetchCount === 'number') {
+                    await channel.prefetch(options.prefetchCount);
                 }
 
                 await channel.consume(
                     queueName,
                     (message) => handleMessage(message),
-                    buildDriverConsumeOptions(consumeOptions),
+                    options,
                 );
             },
         });
@@ -132,67 +173,86 @@ export class Client {
         return channel.waitForConnect();
     }
 
-    // publish(to: string, data: any, options);
-    async publish(options: PublishOptionsExtended) : Promise<boolean> {
+    async publish(ctx: PublishContext) : Promise<boolean>;
+
+    async publish(to: string, data: any) : Promise<boolean>;
+
+    async publish(to: string, data: any, options: PublishOptions): Promise<boolean>;
+
+    async publish(
+        _toOrCtx: PublishContext | string,
+        _data?: any,
+        _options?: PublishOptions,
+    ) : Promise<boolean> {
         let buffer : Buffer;
 
-        if (Buffer.isBuffer(options.content)) {
-            buffer = options.content;
-        } else if (typeof options.content === 'string') {
-            buffer = Buffer.from(options.content, 'utf-8');
+        let to : string;
+        let data : any;
+        let options : PublishOptions;
+        if (typeof _toOrCtx === 'string') {
+            to = _toOrCtx;
+            data = _data;
+
+            if (_options) {
+                options = mergeOptions(_options, this.publishOptions);
+            } else {
+                options = this.publishOptions;
+            }
         } else {
-            buffer = Buffer.from(JSON.stringify(options.content), 'utf-8');
+            to = _toOrCtx.to;
+            data = _toOrCtx.data;
+
+            if (_toOrCtx.options) {
+                options = mergeOptions(_toOrCtx.options, this.publishOptions);
+            } else {
+                options = this.publishOptions;
+            }
         }
 
-        const publishOptions = mergeOptions(
-            options,
-            {
-                exchange: this.config.exchange || {},
-            },
-            this.config.publish,
-        );
+        if (Buffer.isBuffer(data)) {
+            buffer = data;
+        } else if (typeof data === 'string') {
+            buffer = Buffer.from(data, 'utf-8');
+        } else {
+            buffer = Buffer.from(JSON.stringify(data), 'utf-8');
+        }
 
-        // publish to default exchange
-        const queueName = publishOptions.queueName || publishOptions.exchange.routingKey || '';
-
-        const connection = this.useConnection();
+        const { connection } = this;
         const channel = connection.createChannel({
             setup: async (channel: Channel) => {
-                if (isDefaultExchange(publishOptions.exchange.type)) {
-                    if (!queueName) {
+                if (isDefaultExchange(this.exchange.type)) {
+                    if (!to) {
                         throw new Error('The queue name can not be empty if the default exchange is selected.');
                     }
 
-                    await channel.assertQueue(queueName, {
+                    await channel.assertQueue(to, {
                         durable: true,
                     });
 
                     return;
                 }
 
+                if (!this.exchange.name) {
+                    throw new SyntaxError('A non default exchange requires a name.');
+                }
+
                 await channel.assertExchange(
-                    publishOptions.exchange.name,
-                    publishOptions.exchange.type || ExchangeType.TOPIC,
-                    buildDriverExchangeOptions({
-                        durable: true,
-                        ...publishOptions.exchange,
-                    }),
+                    this.exchange.name,
+                    this.exchange.type,
+                    this.exchange.options,
                 );
             },
         });
 
-        if (!queueName) {
-            throw new Error('The exchange.routingKey/queueName can not be empty.');
+        if (!to) {
+            throw new SyntaxError('The publish operation requires a destination.');
         }
 
         const published = await channel.publish(
-            publishOptions.exchange.name || '',
-            queueName,
+            this.exchange.name || '',
+            to,
             buffer,
-            buildDriverPublishOptions({
-                persistent: true,
-                ...publishOptions,
-            }),
+            options,
         );
 
         await channel.close();
