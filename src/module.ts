@@ -8,17 +8,15 @@
 import { connect } from 'amqp-connection-manager';
 import type { Channel, ConsumeMessage } from 'amqplib';
 import process from 'node:process';
-import { merge } from 'smob';
-import { v4 } from 'uuid';
+import type { Connection, ConsumeOptions } from './type';
 import type { Config, ConfigInput } from './config';
 import { buildConfig } from './config';
 import type { ConsumeHandlers } from './consume';
 import { ConsumeHandlerAnyKey, buildDriverConsumeOptions } from './consume';
-import type { ExchangeOptions } from './exchange';
-import { buildDriverExchangeOptions, isDefaultExchange } from './exchange';
+import { ExchangeType, buildDriverExchangeOptions, isDefaultExchange } from './exchange';
 import type { PublishOptionsExtended } from './publish';
 import { buildDriverPublishOptions } from './publish';
-import type { Connection, ConsumeOptions } from './type';
+import { mergeOptions } from './utils';
 
 export class Client {
     protected connection: Connection | undefined;
@@ -51,17 +49,15 @@ export class Client {
         options: ConsumeOptions,
         handlers: ConsumeHandlers,
     ) : Promise<void> {
-        options = merge(options, this.config.consume);
+        const consumeOptions = mergeOptions(
+            options,
+            {
+                exchange: this.config.exchange || {},
+            },
+            this.config.consume,
+        );
 
-        const exchangeOptions = merge(
-            options.exchange || {},
-            this.config.exchange,
-        ) as ExchangeOptions;
-
-        let queueName : string = options.queueName || this.config.publish.queueName || '';
-
-        const requeueOnFailure : boolean = this.config.consume.requeueOnFailure ?? false;
-
+        const requeueOnFailure = consumeOptions.requeueOnFailure ?? false;
         const handleMessage = async (message: ConsumeMessage | null) => {
             if (!message) {
                 return;
@@ -80,16 +76,17 @@ export class Client {
 
                 channel.ack(message);
             } catch (e) {
-                channel.nack(message);
+                channel.nack(message, undefined, requeueOnFailure);
             }
         };
 
         const connection = this.useConnection();
         const channel = connection.createChannel({
             setup: async (channel: Channel) => {
-                if (isDefaultExchange(exchangeOptions.type)) {
+                let queueName = consumeOptions.queueName || consumeOptions.exchange.routingKey || '';
+                if (isDefaultExchange(consumeOptions.exchange.type)) {
                     if (queueName === '') {
-                        throw new Error('The queue name can not be empty if a non default exchange is selected.');
+                        throw new Error('The queue name can not be empty if the default exchange is selected.');
                     }
 
                     await channel.assertQueue(queueName, {
@@ -97,11 +94,11 @@ export class Client {
                     });
                 } else {
                     await channel.assertExchange(
-                        exchangeOptions.name,
-                        exchangeOptions.type,
+                        consumeOptions.exchange.name,
+                        consumeOptions.exchange.type || ExchangeType.TOPIC,
                         buildDriverExchangeOptions({
                             durable: true,
-                            ...exchangeOptions,
+                            ...consumeOptions.exchange,
                         }),
                     );
 
@@ -111,27 +108,23 @@ export class Client {
                         exclusive: true,
                     });
 
-                    if (typeof exchangeOptions.routingKey === 'undefined') {
-                        throw new Error('The routingKey can not be empty if a non default exchange is selected.');
-                    }
-
                     await channel.bindQueue(
                         assertionQueue.queue,
-                        this.config.exchange.name,
-                        exchangeOptions.routingKey,
+                        consumeOptions.exchange.name,
+                        consumeOptions.exchange.routingKey || '',
                     );
 
                     queueName = assertionQueue.queue;
                 }
 
-                if (typeof options.prefetchCount !== 'undefined') {
-                    await channel.prefetch(options.prefetchCount);
+                if (typeof consumeOptions.prefetchCount === 'number') {
+                    await channel.prefetch(consumeOptions.prefetchCount);
                 }
 
                 await channel.consume(
                     queueName,
                     (message) => handleMessage(message),
-                    buildDriverConsumeOptions(options),
+                    buildDriverConsumeOptions(consumeOptions),
                 );
             },
         });
@@ -139,6 +132,7 @@ export class Client {
         return channel.waitForConnect();
     }
 
+    // publish(to: string, data: any, options);
     async publish(options: PublishOptionsExtended) : Promise<boolean> {
         let buffer : Buffer;
 
@@ -150,79 +144,56 @@ export class Client {
             buffer = Buffer.from(JSON.stringify(options.content), 'utf-8');
         }
 
-        options = merge(
+        const publishOptions = mergeOptions(
             options,
-            this.config.publish || {},
+            {
+                exchange: this.config.exchange || {},
+            },
+            this.config.publish,
         );
 
-        if (typeof options.messageId === 'undefined') {
-            options.messageId = options.id || v4();
-        }
-
-        const exchangeOptions = merge(
-            {},
-            options.exchange || {},
-            this.config.exchange,
-        ) as ExchangeOptions;
-
         // publish to default exchange
-        const queueName : string | undefined = options.queueName ||
-            this.config.publish.queueName;
+        const queueName = publishOptions.queueName || publishOptions.exchange.routingKey || '';
 
         const connection = this.useConnection();
         const channel = connection.createChannel({
             setup: async (channel: Channel) => {
-                if (!isDefaultExchange(exchangeOptions.type)) {
-                    await channel.assertExchange(
-                        exchangeOptions.name,
-                        exchangeOptions.type,
-                        buildDriverExchangeOptions({
-                            durable: true,
-                            ...exchangeOptions,
-                        }),
-                    );
+                if (isDefaultExchange(publishOptions.exchange.type)) {
+                    if (!queueName) {
+                        throw new Error('The queue name can not be empty if the default exchange is selected.');
+                    }
+
+                    await channel.assertQueue(queueName, {
+                        durable: true,
+                    });
 
                     return;
                 }
 
-                if (typeof queueName === 'undefined' || queueName === '') {
-                    throw new Error('The queue name can not be empty if a non default exchange is selected.');
-                }
-
-                await channel.assertQueue(queueName, {
-                    durable: true,
-                });
+                await channel.assertExchange(
+                    publishOptions.exchange.name,
+                    publishOptions.exchange.type || ExchangeType.TOPIC,
+                    buildDriverExchangeOptions({
+                        durable: true,
+                        ...publishOptions.exchange,
+                    }),
+                );
             },
         });
 
-        if (!isDefaultExchange(exchangeOptions.type)) {
-            if (typeof exchangeOptions.routingKey === 'undefined') {
-                throw new Error('The routingKey can not be empty if a non default exchange is selected.');
-            }
-
-            const published = await channel.publish(
-                this.config.exchange.name,
-                exchangeOptions.routingKey,
-                buffer,
-                buildDriverPublishOptions({
-                    persistent: true,
-                    ...options,
-                }),
-            );
-
-            await channel.close();
-
-            return published;
+        if (!queueName) {
+            throw new Error('The exchange.routingKey/queueName can not be empty.');
         }
 
-        if (typeof queueName === 'undefined' || queueName === '') {
-            throw new Error('The queue name can not be empty if a non default exchange is selected.');
-        }
-
-        const published = await channel.sendToQueue(queueName, buffer, buildDriverPublishOptions({
-            persistent: true,
-            ...options,
-        }));
+        const published = await channel.publish(
+            publishOptions.exchange.name || '',
+            queueName,
+            buffer,
+            buildDriverPublishOptions({
+                persistent: true,
+                ...publishOptions,
+            }),
+        );
 
         await channel.close();
 

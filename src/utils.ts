@@ -1,4 +1,5 @@
-import { hasOwnProperty } from 'smob';
+import { createMerger, hasOwnProperty } from 'smob';
+import { isExchangeOptions } from './exchange';
 
 export function removeKeysFromOptions<
     T extends Record<string, any>,
@@ -24,3 +25,29 @@ export async function wait(ms: number) {
         }, ms);
     });
 }
+
+const mergeOptions = createMerger({
+    priority: 'left',
+    inPlace: false,
+    clone: true,
+    array: true,
+    arrayDistinct: true,
+    strategy(target, key, value) {
+        if (key !== 'exchange') {
+            return undefined;
+        }
+
+        if (
+            !isExchangeOptions(target[key]) ||
+            !isExchangeOptions(value)
+        ) {
+            return undefined;
+        }
+
+        return target;
+    },
+});
+
+export {
+    mergeOptions,
+};

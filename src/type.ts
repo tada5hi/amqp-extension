@@ -4,16 +4,16 @@ import type { ExchangeOptions } from './exchange';
 
 export type Connection = ReturnType<typeof connect>;
 
-type CommonOptions = {
+export type CommonOptions = {
     /**
      * Exchange
      *
      * default: undefined
      */
-    exchange?: Partial<ExchangeOptions>,
+    exchange?: ExchangeOptions,
 
     /**
-     * Queue name.
+     * Queue name aka routing key.
      *
      * default: ''
      */

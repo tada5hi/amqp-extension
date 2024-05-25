@@ -3,6 +3,6 @@ import type { ExchangeType } from './constants';
 
 export type ExchangeOptions = {
     name: string,
-    type: `${ExchangeType}`,
+    type?: `${ExchangeType}`,
     routingKey?: string,
 } & Options.AssertExchange;

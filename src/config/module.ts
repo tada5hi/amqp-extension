@@ -17,7 +17,7 @@ export function buildConfig(input: ConfigInput) : Config {
         consume: input.consume || {},
         exchange: input.exchange || {
             name: '',
-            type: ExchangeType.DEFAULT,
+            type: ExchangeType.DIRECT,
         },
     };
 }

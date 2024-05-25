@@ -1,10 +1,11 @@
 import type { Options } from 'amqplib';
+import { isObject } from 'smob';
 import { removeKeysFromOptions } from '../utils';
 import { ExchangeType } from './constants';
 import type { ExchangeOptions } from './type';
 
-export function isDefaultExchange(exchange?: `${ExchangeType}`) {
-    return typeof exchange === 'undefined' || exchange === ExchangeType.DEFAULT;
+export function isDefaultExchange(exchange?: `${ExchangeType}`) : exchange is ExchangeType.DIRECT {
+    return typeof exchange === 'undefined' || exchange === ExchangeType.DIRECT;
 }
 
 export function buildDriverExchangeOptions(
@@ -18,4 +19,9 @@ export function buildDriverExchangeOptions(
             'routingKey',
         ],
     );
+}
+
+export function isExchangeOptions(input: unknown) : input is ExchangeOptions {
+    return isObject(input) &&
+        typeof input.type === 'string';
 }

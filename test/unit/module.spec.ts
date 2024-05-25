@@ -15,11 +15,7 @@ describe('src/module', () => {
     beforeAll(async () => {
         const connection = read('MQ_CONNECTION_STRING', '');
         client = new Client({
-            connection,
-            exchange: {
-                name: 'test',
-                type: 'topic',
-            },
+            connection
         })
     })
 
@@ -40,6 +36,8 @@ describe('src/module', () => {
         const published = await client.publish({
             content: 'foo',
             exchange: {
+                type: 'topic',
+                name: 'test',
                 routingKey: 'foo'
             }
         });
@@ -47,11 +45,13 @@ describe('src/module', () => {
         expect(published).toBeTruthy();
     });
 
-    it('should publish and subscribe',  (done) => {
+    it('should publish and subscribe (topic)',  (done) => {
         Promise.resolve()
             .then(() => {
                 return client.consume({
                     exchange: {
+                        type: 'topic',
+                        name: 'test',
                         routingKey: 'foo'
                     }
                 }, {
@@ -65,9 +65,43 @@ describe('src/module', () => {
                 client.publish({
                     content: 'fooBar',
                     exchange: {
+                        type: 'topic',
+                        name: 'test',
                         routingKey: 'foo'
                     }
                 });
             })
+    });
+
+    it('should publish and subscribe (direct)',  (done) => {
+        Promise.resolve()
+            .then(() => {
+                return client.consume({
+                    exchange: {
+                        type: 'direct',
+                        name: '',
+                        routingKey: 'logs'
+                    },
+                    noAck: false
+                }, {
+                    $any: (message, channel) => {
+                        const content = message.content.toString();
+                        expect(content).toEqual('fooBar');
+                        channel.ack(message, true);
+                        setTimeout(() => {
+                            done();
+                        }, 100);
+                    }
+                });
+            }).then(() => {
+                return client.publish({
+                    content: 'fooBar',
+                    exchange: {
+                        type: 'direct',
+                        name: '',
+                        routingKey: 'logs'
+                    }
+                })
+              })
     })
 })
