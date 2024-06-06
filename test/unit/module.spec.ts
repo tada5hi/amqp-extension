@@ -5,9 +5,8 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-
-import {read} from "envix";
-import {Client} from "../../src";
+import { read } from 'envix';
+import { Client } from '../../src';
 
 describe('src/module', () => {
     let client: Client;
@@ -15,58 +14,54 @@ describe('src/module', () => {
     beforeAll(async () => {
         const connectionOptions = read('MQ_CONNECTION_STRING', '');
         client = new Client({
-            connectionOptions
-        })
-    })
+            connectionOptions,
+        });
+    });
 
     afterAll(async () => {
         await client.connection.close();
 
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
         client = undefined;
-    })
+    });
 
     it('should publish message', async () => {
-        const published = await client.publish('foo', 'foo')
+        const published = await client.publish('foo', 'foo');
 
         expect(published).toBeTruthy();
     });
 
-    it('should publish and subscribe to topic exchange',  (done) => {
+    it('should publish and subscribe to topic exchange', (done) => {
         const topicExchange = client.of({
             type: 'topic',
-            name: 'test'
+            name: 'test',
         });
 
         Promise.resolve()
-            .then(() => {
-                return topicExchange.consume('foo', {
-                    $any: (message) => {
-                        const content = message.content.toString();
-                        expect(content).toEqual('fooBar')
-                        done();
-                    }
-                });
-            }).then(() => {
-            topicExchange.publish('foo', 'fooBar');
-            })
+            .then(() => topicExchange.consume('foo', {
+                $any: (message) => {
+                    const content = message.content.toString();
+                    expect(content).toEqual('fooBar');
+                    done();
+                },
+            })).then(() => {
+                topicExchange.publish('foo', 'fooBar');
+            });
     });
 
-    it('should publish and subscribe to direct exchange',  (done) => {
+    it('should publish and subscribe to direct exchange', (done) => {
         Promise.resolve()
-            .then(() => {
-                return client.consume('logs', {
-                    $any: (message, channel) => {
-                        const content = message.content.toString();
-                        expect(content).toEqual('fooBar');
-                        channel.ack(message, true);
-                        setTimeout(() => {
-                            done();
-                        }, 100);
-                    }
-                });
-            }).then(() => {
-                return client.publish('logs', 'fooBar')
-              })
-    })
-})
+            .then(() => client.consume('logs', { noAck: false }, {
+                $any: (message) => {
+                    const content = message.content.toString();
+                    expect(content).toEqual('fooBar');
+                    setTimeout(() => {
+                        done();
+                    }, 100);
+                },
+            })).then(() => client.publish('logs', 'fooBar', {
+                persistent: true,
+            }));
+    });
+});

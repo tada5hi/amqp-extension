@@ -7,14 +7,13 @@
 
 import type { ChannelWrapper } from 'amqp-connection-manager';
 import type { ConsumeMessage, Options } from 'amqplib';
-import type { ConsumeHandlerAnyKey } from './static';
+import type { ConsumeHandlerAnyKey } from './constants';
 
 export {
     ConsumeMessage,
 };
 
 export type ConsumeMessageHandler = (message: ConsumeMessage, channel: ChannelWrapper) => Promise<void> | void;
-export type ConsumeHandlerAnyKeyType = typeof ConsumeHandlerAnyKey;
 
 export type ConsumeHandlers = {
     [ConsumeHandlerAnyKey]?: ConsumeMessageHandler,
