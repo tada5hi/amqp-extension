@@ -12,13 +12,8 @@ This is a library on top of the [amqplib](https://www.npmjs.com/package/amqplib)
 
 - [Installation](#installation)
 - [Usage](#usage)
-  - [Publish](#publish-to-queue)
-  - [Consume](#consume-queue)
-- [Functions](#functions)
-  - [publish](#publish)
-  - [consume](#consume)
-- [Types](#types)
-  - [Config](#config-types)
+  - [Publish](#publish)
+  - [Consume](#consume)
 - [License](#license)
 
 
@@ -30,16 +25,15 @@ npm install amqp-extension --save
 
 ## Usage
 
-### Publish to Queue
+### Publish
 
 The `publish` method allows you to send messages quickly.
-Existing options can be added or overwritten
 
 ```typescript
 import { Client } from "amqp-extension";
 
 const client = new Client({
-    connection: 'amqp://<user>:<password>@<host>',
+    connectionOptions: 'amqp://<user>:<password>@<host>',
     exchange: {
         name: '<name>',
         type: 'topic'
@@ -47,20 +41,15 @@ const client = new Client({
 });
 
 (async () => {
-    await client.publish({
-        content: {
-            type: 'resourceCreated',
-            name: 'foo'
-        }
+    await client.publish('<routing-key>', {
+        foo: 'bar'
     });
 })();
 ```
 
-### Consume Queue
+### Consume
 
-To consume a queue use the `consume` function. As first argument it accepts a configuration object
-and as second argument and object to specify an async callback function handler for a specific message `type`.
-
+To consume a queue use the `consume` function.
 ```typescript
 import {
     Client,
@@ -69,22 +58,16 @@ import {
 } from "amqp-extension";
 
 const client = new Client({
-    connection: 'amqp://<user>:<password>@<host>',
+    connectionOptions: 'amqp://<user>:<password>@<host>',
     exchange: {
         name: '<name>',
         type: 'topic'
     }
 });
 
-const options: ConsumeOptions = {
-    exchange: {
-        routingKey: '<routing-key>'
-    }
-}
-
 (async () => {
-    await client.consume(options, {
-        resourceCreated: async (message: ConsumeMessage) => {
+    await client.consume('<routing-key>', {
+        $any: async (message: ConsumeMessage) => {
             const content = message.content.toString('utf-8');
             const payload = JSON.parse(content);
             console.log(payload);
@@ -92,125 +75,6 @@ const options: ConsumeOptions = {
         }
     });
 })();
-```
-
-## Functions
-
-### publish
-
-▸ `function` **publish**(`message: Message`, `options?: PublishOptions`): `Promise<void>`
-
-Send the constructed queue message to the message broker.
-As second parameter a registered config can be used by specifying the alias or provide the full config object.
-#### Example
-**`Simple`**
-
-```typescript
-import { Client } from "amqp-extension";
-
-const client = new Client({
-    // ...
-});
-
-(async () => {
-    await client.publish({
-        content: {
-            type: 'resourceCreated'
-        }
-    });
-})();
-```
-
-#### Type parameters
-
-| Name  | Description |
-|:------|:------------|
-
-#### Parameters
-
-| Name      | Type             | Description                 |
-|:----------|:-----------------|:----------------------------|
-| `message` | `Message`        | Constructed message object. |
-| `options` | `PublishOptions` | Publish options.            |
-
-#### Returns
-
-`Promise<void>`
-
-The function does not return a value.
-
-### consume
-
-▸ `function` **consume**(`options: ConsumeOptions`, `cb: ConsumeHandlers`): `Promise<void>`
-
-Send the constructed queue message to the message broker.
-As second parameter a registered config can be used by specifying the alias or provide the full config object.
-#### Example
-**`Simple`**
-
-```typescript
-import {
-    Client,
-    ConsumeOptions,
-    ConsumeMessage,
-} from "amqp-extension";
-
-const client = new Client({
-    // ...
-});
-
-const options: ConsumeOptions = {
-    routingKey: '<routing-key>'
-}
-
-(async () => {
-    await client.consume(options, {
-        '<type>': async (message: ConsumeMessage) => {
-            // do some async action :)
-        }
-    });
-})();
-
-```
-
-#### Type parameters
-
-| Name   | Description |
-|:-------|:------------|
-
-
-
-#### Parameters
-
-| Name       | Type              | Description        |
-|:-----------|:------------------|:-------------------|
-| `options`  | `ConsumeOptions`  | Consume options. ) |
-| `handlers` | `ConsumeHandlers` | Handlers object.   |
-
-#### Returns
-
-`Promise<void>`
-
-The function does not return a value.
-
-## Types
-
-### Config Types
-
-```typescript
-import { Options } from 'amqplib';
-import { ExchangeOptions } from '../exchange';
-import { ConsumeOptions, PublishOptions } from '../type';
-
-export type Config = {
-    connection: Options.Connect | string,
-    exchange: ExchangeOptions,
-    publish: PublishOptions,
-    consume: ConsumeOptions
-};
-
-export type ConfigInput = Partial<Exclude<Config, 'connection'>> &
-    Pick<Config, 'connection'>;
 ```
 
 ## License
