@@ -1,3 +1,23 @@
+# [4.0.0-beta.1](https://github.com/Tada5hi/amqp-extension/compare/v3.3.0...v4.0.0-beta.1) (2024-06-06)
+
+
+### Bug Fixes
+
+* **deps:** bump amqplib from 0.10.3 to 0.10.4 ([#368](https://github.com/Tada5hi/amqp-extension/issues/368)) ([dae6c84](https://github.com/Tada5hi/amqp-extension/commit/dae6c840ad69e74a6c5dc37ea7f0fbb6c8ea1bae))
+* **deps:** bump smob from 1.4.1 to 1.5.0 ([#334](https://github.com/Tada5hi/amqp-extension/issues/334)) ([0b2935a](https://github.com/Tada5hi/amqp-extension/commit/0b2935af145d4844510c19b6d3f9d23ac0e3386a))
+
+
+### Features
+
+* adjusted test suite ([a5cc771](https://github.com/Tada5hi/amqp-extension/commit/a5cc7714a141d671d1e97ed67216df0ffc53af49))
+* change publish/consume signature ([ff316ec](https://github.com/Tada5hi/amqp-extension/commit/ff316ec27ac1077c7a6949ea5e5adf6ad1e5e5f5))
+* initial refactoring of config, consume- &p publish-behaviour ([1102aa8](https://github.com/Tada5hi/amqp-extension/commit/1102aa8a8b000336312d89c92434d8c77e7a0424))
+
+
+### BREAKING CHANGES
+
+* public api changed
+
 # [3.3.0](https://github.com/Tada5hi/amqp-extension/compare/v3.2.0...v3.3.0) (2024-03-20)
 
 
