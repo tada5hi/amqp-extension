@@ -100,7 +100,10 @@ export class Client {
         }
 
         const requeueOnFailure = options.requeueOnFailure ?? false;
-        const handleMessage = async (message: ConsumeMessage | null) => {
+        const handleMessage = async (
+            message: ConsumeMessage | null,
+            ch: Channel,
+        ) => {
             if (!message) {
                 return;
             }
@@ -109,16 +112,16 @@ export class Client {
                 handlers[ConsumeHandlerAnyKey];
 
             if (typeof handler === 'undefined') {
-                channel.nack(message, undefined, requeueOnFailure);
+                ch.nack(message, undefined, requeueOnFailure);
                 return;
             }
 
             try {
-                await handler(message, channel);
+                await handler(message, ch);
 
-                channel.ack(message);
+                ch.ack(message);
             } catch (e) {
-                channel.nack(message, undefined, requeueOnFailure);
+                ch.nack(message, undefined, requeueOnFailure);
             }
         };
 
@@ -164,7 +167,7 @@ export class Client {
 
                 await channel.consume(
                     queueName,
-                    (message) => handleMessage(message),
+                    (message) => handleMessage(message, channel),
                     options,
                 );
             },

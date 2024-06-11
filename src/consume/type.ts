@@ -5,15 +5,14 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { ChannelWrapper } from 'amqp-connection-manager';
-import type { ConsumeMessage, Options } from 'amqplib';
+import type { Channel, ConsumeMessage, Options } from 'amqplib';
 import type { ConsumeHandlerAnyKey } from './constants';
 
 export {
     ConsumeMessage,
 };
 
-export type ConsumeMessageHandler = (message: ConsumeMessage, channel: ChannelWrapper) => Promise<void> | void;
+export type ConsumeMessageHandler = (message: ConsumeMessage, channel: Channel) => Promise<void> | void;
 
 export type ConsumeHandlers = {
     [ConsumeHandlerAnyKey]?: ConsumeMessageHandler,
