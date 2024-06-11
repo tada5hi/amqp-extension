@@ -1,3 +1,10 @@
+# [4.0.0-beta.2](https://github.com/Tada5hi/amqp-extension/compare/v4.0.0-beta.1...v4.0.0-beta.2) (2024-06-11)
+
+
+### Bug Fixes
+
+* ensure (n)ack is send on same channel ([ab7026f](https://github.com/Tada5hi/amqp-extension/commit/ab7026f4e65f9cff33cb509dc25a77b72ddc25f1))
+
 # [4.0.0-beta.1](https://github.com/Tada5hi/amqp-extension/compare/v3.3.0...v4.0.0-beta.1) (2024-06-06)
 
 
