@@ -112,16 +112,22 @@ export class Client {
                 handlers[ConsumeHandlerAnyKey];
 
             if (typeof handler === 'undefined') {
-                ch.nack(message, undefined, requeueOnFailure);
+                if (!options.noAck) {
+                    ch.nack(message, undefined, requeueOnFailure);
+                }
                 return;
             }
 
             try {
                 await handler(message, ch);
 
-                ch.ack(message);
+                if (!options.noAck) {
+                    ch.ack(message);
+                }
             } catch (e) {
-                ch.nack(message, undefined, requeueOnFailure);
+                if (!options.noAck) {
+                    ch.nack(message, undefined, requeueOnFailure);
+                }
             }
         };
 
