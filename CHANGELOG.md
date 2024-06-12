@@ -1,3 +1,10 @@
+# [4.0.0-beta.3](https://github.com/Tada5hi/amqp-extension/compare/v4.0.0-beta.2...v4.0.0-beta.3) (2024-06-12)
+
+
+### Bug Fixes
+
+* only ack message if noAck option is false ([d6102e3](https://github.com/Tada5hi/amqp-extension/commit/d6102e3df431c6710257b5bdf59c8e99672e7df6))
+
 # [4.0.0-beta.2](https://github.com/Tada5hi/amqp-extension/compare/v4.0.0-beta.1...v4.0.0-beta.2) (2024-06-11)
 
 
