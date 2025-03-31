@@ -1,3 +1,27 @@
+# [4.0.0](https://github.com/Tada5hi/amqp-extension/compare/v3.3.0...v4.0.0) (2025-03-31)
+
+
+### Bug Fixes
+
+* **deps:** bump amqplib from 0.10.3 to 0.10.4 ([#368](https://github.com/Tada5hi/amqp-extension/issues/368)) ([dae6c84](https://github.com/Tada5hi/amqp-extension/commit/dae6c840ad69e74a6c5dc37ea7f0fbb6c8ea1bae))
+* **deps:** bump smob from 1.4.1 to 1.5.0 ([#334](https://github.com/Tada5hi/amqp-extension/issues/334)) ([0b2935a](https://github.com/Tada5hi/amqp-extension/commit/0b2935af145d4844510c19b6d3f9d23ac0e3386a))
+* **deps:** bump the minorandpatch group with 10 updates ([#428](https://github.com/Tada5hi/amqp-extension/issues/428)) ([3ffb425](https://github.com/Tada5hi/amqp-extension/commit/3ffb425c3ff7e987791d80172fe4166a3b9f7dc5))
+* **deps:** bump uuid from 9.0.1 to 11.1.0 in the majorprod group ([#426](https://github.com/Tada5hi/amqp-extension/issues/426)) ([2c6bdc0](https://github.com/Tada5hi/amqp-extension/commit/2c6bdc095aeb6760467d0eed678fe2b4cd421f70))
+* ensure (n)ack is send on same channel ([ab7026f](https://github.com/Tada5hi/amqp-extension/commit/ab7026f4e65f9cff33cb509dc25a77b72ddc25f1))
+* only ack message if noAck option is false ([d6102e3](https://github.com/Tada5hi/amqp-extension/commit/d6102e3df431c6710257b5bdf59c8e99672e7df6))
+
+
+### Features
+
+* adjusted test suite ([a5cc771](https://github.com/Tada5hi/amqp-extension/commit/a5cc7714a141d671d1e97ed67216df0ffc53af49))
+* change publish/consume signature ([ff316ec](https://github.com/Tada5hi/amqp-extension/commit/ff316ec27ac1077c7a6949ea5e5adf6ad1e5e5f5))
+* initial refactoring of config, consume- &p publish-behaviour ([1102aa8](https://github.com/Tada5hi/amqp-extension/commit/1102aa8a8b000336312d89c92434d8c77e7a0424))
+
+
+### BREAKING CHANGES
+
+* public api changed
+
 # [4.0.0-beta.3](https://github.com/Tada5hi/amqp-extension/compare/v4.0.0-beta.2...v4.0.0-beta.3) (2024-06-12)
 
 
