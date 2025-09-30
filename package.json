@@ -36,10 +36,10 @@
     "homepage": "https://github.com/Tada5hi/amqp-extension#readme",
     "dependencies": {
         "@types/amqplib": "^0.10.7",
-        "amqp-connection-manager": "^4.1.14",
+        "amqp-connection-manager": "^5.0.0",
         "amqplib": "^0.10.7",
         "smob": "^1.5.0",
-        "uuid": "^11.1.0"
+        "uuid": "^13.0.0"
     },
     "devDependencies": {
         "@tada5hi/commitlint-config": "^1.2.4",
