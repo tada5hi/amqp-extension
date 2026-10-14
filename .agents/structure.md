@@ -1,6 +1,6 @@
 # Project Structure
 
-Single npm package, CommonJS output.
+Single npm package, ESM-only output (`"type": "module"`), Node `>=22`.
 
 ## Directory Layout
 
@@ -23,15 +23,18 @@ amqp-extension/
 │   └── publish/
 │       └── type.ts           # PublishOptions, PublishContext
 ├── test/
-│   ├── jest.config.js        # rootDir '../', globalSetup/teardown, coverage thresholds
-│   ├── setup.js              # Starts rabbitmq:3-management container, writes MQ_CONNECTION_STRING
-│   ├── teardown.js           # Stops the container
+│   ├── vitest.config.ts      # include glob, globalSetup, timeouts, coverage thresholds
+│   ├── utils/global-setup.ts # Starts rabbitmq:3-management container, provides MQ_CONNECTION_STRING
 │   ├── unit/module.spec.ts   # Client publish/consume tests against a live broker
 │   └── data/                 # Git-ignored scratch dir
 ├── dist/                     # Build output (git-ignored, published)
-├── .github/workflows/main.yml
-├── commitlint.config.js, release.config.js
-└── tsconfig.json, tsconfig.eslint.json, .eslintrc
+├── .github/
+│   ├── actions/              # Composite install/build actions (cached)
+│   └── workflows/            # main.yml (CI), release.yml (release-please + publish)
+├── .husky/commit-msg         # commitlint
+├── eslint.config.js, commitlint.config.mjs
+├── release-please-config.json, .release-please-manifest.json
+└── tsconfig.json (noEmit), tsdown.config.ts
 ```
 
 ## Module Responsibilities
@@ -51,17 +54,24 @@ amqp-extension/
 | Dependency                 | Role                                                                  |
 |----------------------------|-----------------------------------------------------------------------|
 | `amqp-connection-manager`  | Reconnecting connection and channel wrapper (`connect`, `createChannel({ setup })`) |
-| `amqplib`, `@types/amqplib`| Underlying AMQP 0-9-1 client; option types (`Options.*`) are re-used directly |
+| `amqplib`                  | Underlying AMQP 0-9-1 client with bundled types; option types (`Options.*`) are re-used directly |
 | `smob`                     | `createMerger` for option merging, `isObject`                      |
-| `uuid`                     | Declared dependency, currently not imported in `src/`               |
 
 ## Package Exports
 
 ```json
 {
-    "main": "./dist/index.js",
-    "typings": "dist/index.d.ts"
+    "type": "module",
+    "main": "dist/index.mjs",
+    "types": "dist/index.d.mts",
+    "exports": {
+        "./package.json": "./package.json",
+        ".": {
+            "types": "./dist/index.d.mts",
+            "import": "./dist/index.mjs"
+        }
+    }
 }
 ```
 
-There is no `exports` map. Everything re-exported from `src/index.ts` is public API. `src/utils.ts` (`mergeOptions`) is **not** re-exported and stays internal.
+There is no `require` condition. Everything re-exported from `src/index.ts` is public API. `src/utils.ts` (`mergeOptions`) is **not** re-exported and stays internal.
