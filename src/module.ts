@@ -20,6 +20,7 @@ import type { Exchange } from './exchange';
 import {
     ExchangeType, isDefaultExchange,
 } from './exchange';
+import { buildAssertQueueOptions } from './queue/utils';
 import { mergeOptions } from './utils';
 
 export class Client {
@@ -139,10 +140,7 @@ export class Client {
                         throw new Error('The queue name can not be empty if the default exchange is selected.');
                     }
 
-                    await channel.assertQueue(queueName, {
-                        durable: true,
-                        ...options.queueOptions,
-                    });
+                    await channel.assertQueue(queueName, buildAssertQueueOptions(options.queueOptions));
                 } else {
                     await channel.assertExchange(
                         this.exchange.name || '',
@@ -235,10 +233,7 @@ export class Client {
                         throw new Error('The queue name can not be empty if the default exchange is selected.');
                     }
 
-                    await channel.assertQueue(to, {
-                        durable: true,
-                        ...options.queueOptions,
-                    });
+                    await channel.assertQueue(to, buildAssertQueueOptions(options.queueOptions));
 
                     return;
                 }

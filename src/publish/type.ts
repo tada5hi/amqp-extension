@@ -6,15 +6,13 @@
  */
 
 import type { Options } from 'amqplib';
+import type { QueueOptions } from '../queue';
 
 export type PublishOptions = Options.Publish & {
     /**
-     * Options for asserting the named queue of the default exchange.
-     * Must match the consumer's queueOptions.
-     *
-     * Default: { durable: true }
+     * Options of the named queue asserted for the default exchange.
      */
-    queueOptions?: Options.AssertQueue
+    queueOptions?: QueueOptions
 };
 export type PublishContext = {
     to: string,

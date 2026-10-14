@@ -6,6 +6,7 @@
  */
 
 import type { Channel, ConsumeMessage, Options } from 'amqplib';
+import type { QueueOptions } from '../queue';
 import type { ConsumeHandlerAnyKey } from './constants';
 
 export {
@@ -32,13 +33,9 @@ export type ConsumeOptions = Options.Consume & {
     prefetchCount?: number,
 
     /**
-     * Options for asserting the named queue of the default exchange,
-     * e.g. { arguments: { 'x-single-active-consumer': true } }.
-     * Publisher and consumer must pass the same options.
-     *
-     * Default: { durable: true }
+     * Options of the named queue asserted for the default exchange.
      */
-    queueOptions?: Options.AssertQueue
+    queueOptions?: QueueOptions
 };
 
 export type ConsumeContext = {
