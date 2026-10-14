@@ -62,4 +62,36 @@ describe('src/module', () => {
         await expect(client.publish('logs', 'fooBar', { persistent: true })).resolves.toBeTruthy();
         await expect(received).resolves.toEqual('fooBar');
     });
+
+    it('should deliver to a single active consumer in order', async () => {
+        const queueOptions = { singleActiveConsumer: true };
+        const received: Record<string, string[]> = { a: [], b: [] };
+
+        await client.consume('sac', { queueOptions, prefetchCount: 1 }, {
+            $any: (message) => {
+                received.a.push(message.content.toString());
+            },
+        });
+        await client.consume('sac', { queueOptions, prefetchCount: 1 }, {
+            $any: (message) => {
+                received.b.push(message.content.toString());
+            },
+        });
+
+        const sent = ['1', '2', '3', '4', '5', '6'];
+        await sent.reduce(
+            (prev, item) => prev.then(() => client.publish('sac', item, { queueOptions })),
+            Promise.resolve(true),
+        );
+
+        const deadline = Date.now() + 5000;
+        while (received.a.length + received.b.length < sent.length && Date.now() < deadline) {
+            await new Promise((resolve) => { setTimeout(resolve, 20); });
+        }
+
+        const active = received.a.length > 0 ? received.a : received.b;
+        const passive = received.a.length > 0 ? received.b : received.a;
+        expect(active).toEqual(sent);
+        expect(passive).toEqual([]);
+    });
 });
