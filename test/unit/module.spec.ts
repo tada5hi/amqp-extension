@@ -64,4 +64,29 @@ describe('src/module', () => {
                 persistent: true,
             }));
     });
+
+    it('should deliver to a single active consumer in order', async () => {
+        const queueOptions = { arguments: { 'x-single-active-consumer': true } };
+        const received: Record<string, string[]> = { a: [], b: [] };
+
+        await client.consume('sac', { queueOptions, prefetchCount: 1 }, {
+            $any: (message) => { received.a.push(message.content.toString()); },
+        });
+        await client.consume('sac', { queueOptions, prefetchCount: 1 }, {
+            $any: (message) => { received.b.push(message.content.toString()); },
+        });
+
+        const sent = ['1', '2', '3', '4', '5', '6'];
+        await sent.reduce(
+            (prev, item) => prev.then(() => client.publish('sac', item, { queueOptions })),
+            Promise.resolve(true),
+        );
+
+        await new Promise((resolve) => { setTimeout(resolve, 500); });
+
+        const active = received.a.length > 0 ? received.a : received.b;
+        const passive = received.a.length > 0 ? received.b : received.a;
+        expect(active).toEqual(sent);
+        expect(passive).toEqual([]);
+    });
 });

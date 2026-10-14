@@ -29,7 +29,16 @@ export type ConsumeOptions = Options.Consume & {
     /**
      * Default: undefined
      */
-    prefetchCount?: number
+    prefetchCount?: number,
+
+    /**
+     * Options for asserting the named queue of the default exchange,
+     * e.g. { arguments: { 'x-single-active-consumer': true } }.
+     * Publisher and consumer must pass the same options.
+     *
+     * Default: { durable: true }
+     */
+    queueOptions?: Options.AssertQueue
 };
 
 export type ConsumeContext = {

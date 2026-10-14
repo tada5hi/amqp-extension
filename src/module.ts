@@ -141,6 +141,7 @@ export class Client {
 
                     await channel.assertQueue(queueName, {
                         durable: true,
+                        ...options.queueOptions,
                     });
                 } else {
                     await channel.assertExchange(
@@ -236,6 +237,7 @@ export class Client {
 
                     await channel.assertQueue(to, {
                         durable: true,
+                        ...options.queueOptions,
                     });
 
                     return;
