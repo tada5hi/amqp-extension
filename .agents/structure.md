@@ -58,7 +58,7 @@ amqp-extension/
 |----------------------------|-----------------------------------------------------------------------|
 | `amqp-connection-manager`  | Reconnecting connection and channel wrapper (`connect`, `createChannel({ setup })`) |
 | `amqplib`                  | Underlying AMQP 0-9-1 client with bundled types; option types (`Options.*`) are re-used directly |
-| `smob`                     | `createMerger` for option merging, `isObject`                      |
+| `smob`                     | `createMerger` for option merging                                     |
 
 ## Package Exports
 

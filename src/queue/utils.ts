@@ -88,20 +88,27 @@ export function planTopology(
 export async function assertTopology(channel: Channel, topology: Topology) : Promise<string | undefined> {
     // A rejected declaration closes the channel with an 'error' event. Without a listener, amqplib rethrows it
     // and tears down the whole connection. The failed setup still rejects, so the caller sees the error.
-    channel.on('error', () => undefined);
+    // Only while declaring: a channel error after setup must still recycle the connection, so
+    // amqp-connection-manager re-runs the setup (a channel-only close is never recovered by it).
+    const ignore = () => undefined;
+    channel.on('error', ignore);
 
-    if (topology.exchange) {
-        await channel.assertExchange(topology.exchange.name, topology.exchange.type, topology.exchange.options);
+    try {
+        if (topology.exchange) {
+            await channel.assertExchange(topology.exchange.name, topology.exchange.type, topology.exchange.options);
+        }
+
+        if (!topology.queue) {
+            return undefined;
+        }
+
+        const { queue } = await channel.assertQueue(topology.queue.name, topology.queue.options);
+        if (topology.exchange && typeof topology.bind === 'string') {
+            await channel.bindQueue(queue, topology.exchange.name, topology.bind);
+        }
+
+        return queue;
+    } finally {
+        channel.off('error', ignore);
     }
-
-    if (!topology.queue) {
-        return undefined;
-    }
-
-    const { queue } = await channel.assertQueue(topology.queue.name, topology.queue.options);
-    if (topology.exchange && typeof topology.bind === 'string') {
-        await channel.bindQueue(queue, topology.exchange.name, topology.bind);
-    }
-
-    return queue;
 }

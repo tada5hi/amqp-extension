@@ -29,11 +29,11 @@ For every non-default type (`topic`, `fanout`, `match`), `consume(from, ...)` do
 
 `planTopology(exchange, key, options, consume?)` (`src/queue/utils.ts`) is pure. It returns a `Topology` (`{ exchange?, queue?, bind? }`) and throws on invalid input (an empty queue name on the default exchange, a nameless named exchange, an empty publish key on a named exchange) **before any channel is opened**. `assertTopology(channel, topology)` declares it and is only ever called from a channel `setup` callback, so it replays automatically after a reconnect.
 
-`assertTopology` also attaches a no-op `'error'` listener to the raw amqplib channel. amqp-connection-manager doesn't, and without it amqplib rethrows a channel-level error (e.g. a 406 on a mismatched queue declaration) and tears down the **whole connection**, which then reconnects only after 60 s.
+`assertTopology` attaches a no-op `'error'` listener to the raw amqplib channel **only while declaring**. amqp-connection-manager doesn't, and without it amqplib rethrows a channel-level error (e.g. a 406 on a mismatched queue declaration) and tears down the **whole connection**, which then reconnects only after 60 s. After setup the listener is removed on purpose: amqp-connection-manager never recovers a channel-only close, so a runtime channel error (e.g. a handler acking a message itself, or the broker's `consumer_timeout`) must still recycle the connection, which re-runs the setup and re-registers the consumer.
 
 ### 4. Setup failures reject the call
 
-`publish` and `consume` wait with `ready(wrapper)`, which resolves on `waitForConnect()` and rejects on the wrapper's `'error'` event, i.e. when a setup function fails. A failed `consume` closes its channel. The listener stays attached, so setup errors after a later reconnect are swallowed instead of crashing the process (`ponytail:` ceiling: no `onError` hook yet).
+`publish` and `consume` wait with `ready(wrapper)`, which resolves on `waitForConnect()` and rejects on the wrapper's `'error'` event (a setup function failed) or `'close'` event (e.g. `client.close()` before the channel was set up, which otherwise never settles). A failed `consume` closes its channel. The listener stays attached, so setup errors after a later reconnect are swallowed instead of crashing the process (`ponytail:` ceiling: no `onError` hook yet).
 
 ### 5. One channel per publish
 

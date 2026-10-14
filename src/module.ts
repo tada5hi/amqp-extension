@@ -19,12 +19,13 @@ import { mergeOptions } from './utils';
 
 /**
  * Resolve once the channel is set up, reject when a setup function fails
- * (e.g. the broker rejects a declaration).
+ * (e.g. the broker rejects a declaration) or the channel is closed first (client.close()).
  */
 function ready(channel: ChannelWrapper) : Promise<void> {
     return new Promise((resolve, reject) => {
         // ponytail: the listener stays, so setup errors after a reconnect are swallowed instead of crashing the process
         channel.on('error', reject);
+        channel.once('close', () => reject(new Error('Channel closed')));
         channel.waitForConnect().then(resolve);
     });
 }

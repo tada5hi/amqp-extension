@@ -13,6 +13,7 @@ import {
     inject,
     it,
 } from 'vitest';
+import { connect } from 'amqp-connection-manager';
 import { Client } from '../../src';
 
 describe('src/module', () => {
@@ -114,12 +115,35 @@ describe('src/module', () => {
         await expect(client.publish('foo', 'bar')).resolves.toBe(true);
     });
 
-    it('should reject invalid input before opening a channel', async () => {
+    it('should reject invalid input with a SyntaxError', async () => {
         const nameless = client.of({ type: 'topic' });
 
         await expect(nameless.consume('foo', { $any: () => {} })).rejects.toThrow(SyntaxError);
         await expect(nameless.publish('foo', 'bar')).rejects.toThrow(SyntaxError);
         await expect(client.of({ type: 'topic', name: 'test' }).publish('', 'bar')).rejects.toThrow(SyntaxError);
+    });
+
+    it('should recycle the connection on a channel error after setup', { timeout: 10_000 }, async () => {
+        const other = new Client({ connectionOptions: inject('MQ_CONNECTION_STRING') });
+        const disconnected = new Promise((resolve) => { other.connection.once('disconnect', resolve); });
+
+        // acking inside the handler makes the second ack fail: 406 unknown delivery tag
+        await other.consume('double-ack', { $any: (message, channel) => { channel.ack(message); } });
+        await other.publish('double-ack', 'fooBar');
+
+        // the connection is recycled, so the consumer is re-registered instead of silently dying
+        await expect(disconnected).resolves.toBeDefined();
+        await other.close();
+    });
+
+    it('should reject a pending publish when the client is closed', { timeout: 10_000 }, async () => {
+        // never connects; a short retry delay keeps close() from waiting for the default 60 s
+        const other = new Client({ connection: connect('amqp://root:start123@127.0.0.1:1', { reconnectTimeInSeconds: 0.1 }) });
+        const published = other.publish('closed', 'fooBar');
+
+        await other.close();
+
+        await expect(published).rejects.toThrow('Channel closed');
     });
 
     it('should close the connection', async () => {
