@@ -21,7 +21,7 @@ export type ConsumeHandlers = {
     [key:string] : ConsumeMessageHandler
 };
 
-export type ConsumeOptions = Options.Consume & {
+export type ConsumeOptions = Options.Consume & QueueOptions & {
     /**
      * Default: false
      */
@@ -30,12 +30,7 @@ export type ConsumeOptions = Options.Consume & {
     /**
      * Default: undefined
      */
-    prefetchCount?: number,
-
-    /**
-     * Options of the named queue asserted for the default exchange.
-     */
-    queueOptions?: QueueOptions
+    prefetchCount?: number
 };
 
 export type ConsumeContext = {

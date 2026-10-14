@@ -64,15 +64,14 @@ describe('src/module', () => {
     });
 
     it('should deliver to a single active consumer in order', async () => {
-        const queueOptions = { singleActiveConsumer: true };
         const received: Record<string, string[]> = { a: [], b: [] };
 
-        await client.consume('sac', { queueOptions, prefetchCount: 1 }, {
+        await client.consume('sac', { singleActiveConsumer: true, prefetchCount: 1 }, {
             $any: (message) => {
                 received.a.push(message.content.toString());
             },
         });
-        await client.consume('sac', { queueOptions, prefetchCount: 1 }, {
+        await client.consume('sac', { singleActiveConsumer: true, prefetchCount: 1 }, {
             $any: (message) => {
                 received.b.push(message.content.toString());
             },
@@ -80,7 +79,7 @@ describe('src/module', () => {
 
         const sent = ['1', '2', '3', '4', '5', '6'];
         await sent.reduce(
-            (prev, item) => prev.then(() => client.publish('sac', item, { queueOptions })),
+            (prev, item) => prev.then(() => client.publish('sac', item, { singleActiveConsumer: true })),
             Promise.resolve(true),
         );
 

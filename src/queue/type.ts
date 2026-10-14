@@ -6,7 +6,8 @@
  */
 
 /**
- * Options of the named, durable queue asserted for the default exchange.
+ * Options of the named, durable queue asserted for the default exchange,
+ * accepted flat on both ConsumeOptions and PublishOptions.
  * Publisher and consumer must pass the same options: a broker rejects
  * re-declaring a queue with different arguments.
  */
