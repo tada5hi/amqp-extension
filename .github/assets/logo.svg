@@ -1,0 +1,83 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="ae-title">
+    <title id="ae-title">amqp-extension logo: a publisher feeding an exchange that routes messages into two queues</title>
+
+    <defs>
+        <linearGradient id="ae-tile" x1="24" y1="24" x2="232" y2="232" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#F97316" stop-opacity="0.16"/>
+            <stop offset="1" stop-color="#F43F5E" stop-opacity="0.16"/>
+        </linearGradient>
+        <linearGradient id="ae-edge" x1="24" y1="24" x2="232" y2="232" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#F97316"/>
+            <stop offset="1" stop-color="#F43F5E"/>
+        </linearGradient>
+
+        <linearGradient id="ae-stem" x1="52" y1="128" x2="96" y2="128" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#F59E0B"/>
+            <stop offset="1" stop-color="#F97316"/>
+        </linearGradient>
+
+        <!-- the upper route runs orange to amber, the lower orange to rose -->
+        <linearGradient id="ae-route-a" x1="128" y1="128" x2="160" y2="80" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#F97316"/>
+            <stop offset="1" stop-color="#FBBF24"/>
+        </linearGradient>
+        <linearGradient id="ae-route-b" x1="128" y1="128" x2="160" y2="176" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#F97316"/>
+            <stop offset="1" stop-color="#F43F5E"/>
+        </linearGradient>
+
+        <linearGradient id="ae-exchange" x1="112" y1="106" x2="112" y2="150" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#FB923C"/>
+            <stop offset="1" stop-color="#EA580C"/>
+        </linearGradient>
+        <linearGradient id="ae-node" x1="52" y1="111" x2="52" y2="145" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#FBBF24"/>
+            <stop offset="1" stop-color="#F97316"/>
+        </linearGradient>
+    </defs>
+
+    <!-- rounded app-icon tile -->
+    <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#ae-tile)"/>
+    <rect x="8.75" y="8.75" width="238.5" height="238.5" rx="55.25" stroke="url(#ae-edge)" stroke-opacity="0.35" stroke-width="1.5"/>
+
+    <!-- publisher → exchange, then one route per bound queue -->
+    <path d="M52 128 H96" stroke="url(#ae-stem)" stroke-width="12" stroke-linecap="round"/>
+    <path d="M128 128 C146 128 142 80 160 80" stroke="url(#ae-route-a)" stroke-width="12" stroke-linecap="round"/>
+    <path d="M128 128 C146 128 142 176 160 176" stroke="url(#ae-route-b)" stroke-width="12" stroke-linecap="round"/>
+
+    <!-- queues: a pill holding buffered messages -->
+    <rect x="160" y="60" width="68" height="40" rx="14" fill="#FBBF24" fill-opacity="0.16" stroke="#FBBF24" stroke-opacity="0.6" stroke-width="2"/>
+    <rect x="160" y="156" width="68" height="40" rx="14" fill="#F43F5E" fill-opacity="0.16" stroke="#F43F5E" stroke-opacity="0.6" stroke-width="2"/>
+    <g fill="#FBBF24">
+        <rect x="172" y="70" width="10" height="20" rx="3" fill-opacity="0.45"/>
+        <rect x="189" y="70" width="10" height="20" rx="3" fill-opacity="0.7"/>
+        <rect x="206" y="70" width="10" height="20" rx="3"/>
+    </g>
+    <g fill="#F43F5E">
+        <rect x="172" y="166" width="10" height="20" rx="3" fill-opacity="0.45"/>
+        <rect x="189" y="166" width="10" height="20" rx="3" fill-opacity="0.7"/>
+        <rect x="206" y="166" width="10" height="20" rx="3"/>
+    </g>
+
+    <!-- one message per route, published together and routed in parallel -->
+    <g>
+        <circle r="12" fill="#FFFFFF" fill-opacity="0.2"/>
+        <circle r="5.5" fill="#FFFFFF"/>
+        <animateMotion dur="3s" repeatCount="indefinite" path="M52 128 H128 C146 128 142 80 160 80 H174"/>
+        <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.12;0.85;1" dur="3s" repeatCount="indefinite"/>
+    </g>
+    <g>
+        <circle r="12" fill="#FFFFFF" fill-opacity="0.2"/>
+        <circle r="5.5" fill="#FFFFFF"/>
+        <animateMotion dur="3s" repeatCount="indefinite" path="M52 128 H128 C146 128 142 176 160 176 H174"/>
+        <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.12;0.85;1" dur="3s" repeatCount="indefinite"/>
+    </g>
+
+    <!-- the exchange, a routing diamond -->
+    <path d="M112 104 L136 128 L112 152 L88 128 Z" fill="url(#ae-exchange)" fill-opacity="0.18"/>
+    <path d="M112 112 L128 128 L112 144 L96 128 Z" fill="url(#ae-exchange)"/>
+
+    <!-- the publisher -->
+    <circle cx="52" cy="128" r="28" fill="url(#ae-node)" fill-opacity="0.16"/>
+    <circle cx="52" cy="128" r="16" fill="url(#ae-node)"/>
+</svg>
