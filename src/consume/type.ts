@@ -6,6 +6,7 @@
  */
 
 import type { Channel, ConsumeMessage, Options } from 'amqplib';
+import type { QueueOptions } from '../queue';
 import type { ConsumeHandlerAnyKey } from './constants';
 
 export type {
@@ -29,7 +30,12 @@ export type ConsumeOptions = Options.Consume & {
     /**
      * Default: undefined
      */
-    prefetchCount?: number
+    prefetchCount?: number,
+
+    /**
+     * Options of the named queue asserted for the default exchange.
+     */
+    queueOptions?: QueueOptions
 };
 
 export type ConsumeContext = {

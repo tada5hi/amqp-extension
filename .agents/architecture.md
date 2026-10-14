@@ -14,7 +14,7 @@ A thin facade over `amqp-connection-manager`. One `Client` holds the following:
 
 ### 1. `direct` type means the default exchange
 
-`isDefaultExchange(type)` is true for `undefined` or `'direct'`. In that mode, `to`/`from` is a **queue name**: the queue is asserted `durable: true` and messages are published to exchange `''` with the queue name as routing key. An empty queue name throws.
+`isDefaultExchange(type)` is true for `undefined` or `'direct'`. In that mode, `to`/`from` is a **queue name**: the queue is asserted with `buildAssertQueueOptions(options.queueOptions)` (always `durable: true`; `singleActiveConsumer` adds the `x-single-active-consumer` argument) and messages are published to exchange `''` with the queue name as routing key. An empty queue name throws. `queueOptions` is accepted on both `PublishOptions` and `ConsumeOptions`, and publisher and consumer must pass the same values, because the broker rejects re-declaring a queue with different arguments. Named exchanges ignore it.
 
 ### 2. Named exchanges use an exclusive, temporary queue per consumer
 
@@ -94,4 +94,4 @@ consume(from, options?, handlers)
 | `connectionOptions` | `amqplib` `Options.Connect` or URL string, used when no `connection` is given |
 | `exchange`          | `{ type, name?, options? }`. Defaults to the default exchange   |
 | `publishOptions`    | Defaults merged into every `publish`                           |
-| `consumeOptions`    | Defaults merged into every `consume`. Extra fields: `requeueOnFailure`, `prefetchCount` |
+| `consumeOptions`    | Defaults merged into every `consume`. Extra fields: `requeueOnFailure`, `prefetchCount`, `queueOptions` |

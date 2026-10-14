@@ -78,6 +78,31 @@ const client = new Client({
 })();
 ```
 
+### Queue Options
+
+On the default exchange, `consume` and `publish` assert a named, durable queue.
+`queueOptions` configures it: `singleActiveConsumer` delivers to one consumer at
+a time, in publish order, and fails over to another when it goes away. A broker
+rejects re-declaring a queue with different arguments, so publisher and consumer
+must pass the same options.
+
+```typescript
+import { Client, ConsumeMessage } from "amqp-extension";
+
+// no exchange: the default exchange routes to the queue named in each call
+const client = new Client({
+    connectionOptions: 'amqp://<user>:<password>@<host>',
+});
+
+const queueOptions = { singleActiveConsumer: true };
+
+await client.consume('<queue>', { queueOptions, prefetchCount: 1 }, {
+    $any: async (message: ConsumeMessage) => { /* ... */ },
+});
+
+await client.publish('<queue>', { foo: 'bar' }, { queueOptions });
+```
+
 ## License
 
 Made with 💚
