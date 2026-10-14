@@ -86,6 +86,13 @@ rejects re-declaring a queue with different arguments, so publisher and consumer
 must pass the same options.
 
 ```typescript
+import { Client, ConsumeMessage } from "amqp-extension";
+
+// no exchange: the default exchange routes to the queue named in each call
+const client = new Client({
+    connectionOptions: 'amqp://<user>:<password>@<host>',
+});
+
 const queueOptions = { singleActiveConsumer: true };
 
 await client.consume('<queue>', { queueOptions, prefetchCount: 1 }, {

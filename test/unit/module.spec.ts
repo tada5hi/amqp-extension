@@ -82,7 +82,10 @@ describe('src/module', () => {
             Promise.resolve(true),
         );
 
-        await new Promise((resolve) => { setTimeout(resolve, 500); });
+        const deadline = Date.now() + 5000;
+        while (received.a.length + received.b.length < sent.length && Date.now() < deadline) {
+            await new Promise((resolve) => { setTimeout(resolve, 20); });
+        }
 
         const active = received.a.length > 0 ? received.a : received.b;
         const passive = received.a.length > 0 ? received.b : received.a;
