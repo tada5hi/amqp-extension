@@ -18,7 +18,8 @@ import type { ConsumeContext, ConsumeHandlers, ConsumeOptions } from './consume'
 import { ConsumeHandlerAnyKey, isConsumeHandlers } from './consume';
 import type { Exchange } from './exchange';
 import {
-    ExchangeType, isDefaultExchange,
+    ExchangeType,
+    isDefaultExchange,
 } from './exchange';
 import { mergeOptions } from './utils';
 
@@ -35,9 +36,7 @@ export class Client {
         if (ctx.connection) {
             this.connection = ctx.connection;
         } else {
-            this.connection = connect(ctx.connectionOptions, {
-                reconnectTimeInSeconds: 60,
-            });
+            this.connection = connect(ctx.connectionOptions, { reconnectTimeInSeconds: 60 });
 
             process.once('SIGINT', async () => {
                 if (this.connection) {
@@ -124,7 +123,7 @@ export class Client {
                 if (!options.noAck) {
                     ch.ack(message);
                 }
-            } catch (e) {
+            } catch {
                 if (!options.noAck) {
                     ch.nack(message, undefined, requeueOnFailure);
                 }
@@ -139,9 +138,7 @@ export class Client {
                         throw new Error('The queue name can not be empty if the default exchange is selected.');
                     }
 
-                    await channel.assertQueue(queueName, {
-                        durable: true,
-                    });
+                    await channel.assertQueue(queueName, { durable: true });
                 } else {
                     await channel.assertExchange(
                         this.exchange.name || '',
@@ -234,9 +231,7 @@ export class Client {
                         throw new Error('The queue name can not be empty if the default exchange is selected.');
                     }
 
-                    await channel.assertQueue(to, {
-                        durable: true,
-                    });
+                    await channel.assertQueue(to, { durable: true });
 
                     return;
                 }
