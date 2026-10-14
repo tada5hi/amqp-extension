@@ -77,6 +77,23 @@ const client = new Client({
 })();
 ```
 
+### Queue Options
+
+On the default exchange, `consume` and `publish` assert a named, durable queue.
+`queueOptions` extends that assertion, e.g. to deliver to a single active
+consumer in publish order. A broker rejects re-declaring a queue with different
+arguments, so publisher and consumer must pass the same options.
+
+```typescript
+const queueOptions = { arguments: { 'x-single-active-consumer': true } };
+
+await client.consume('<queue>', { queueOptions, prefetchCount: 1 }, {
+    $any: async (message: ConsumeMessage) => { /* ... */ },
+});
+
+await client.publish('<queue>', { foo: 'bar' }, { queueOptions });
+```
+
 ## License
 
 Made with 💚
