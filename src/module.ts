@@ -17,17 +17,50 @@ import { assertTopology, planTopology } from './queue/utils';
 import type { ClientContext, Connection } from './type';
 import { mergeOptions } from './utils';
 
+// connections closed through Client.close(), shared by of() siblings
+const closed = new WeakSet<Connection>();
+
+const noop = () => undefined;
+
 /**
- * Resolve once the channel is set up, reject when a setup function fails
- * (e.g. the broker rejects a declaration) or the channel is closed first (client.close()).
+ * Wrap a setup function, so a broker rejection during it (e.g. 403/406) closes only this channel:
+ * without an 'error' listener on the raw channel, amqplib rethrows it and tears down the whole connection.
+ * Only during setup: a channel error afterwards must still recycle the connection, because
+ * amqp-connection-manager never recovers a channel-only close, so consumers would silently die.
  */
-function ready(channel: ChannelWrapper) : Promise<void> {
-    return new Promise((resolve, reject) => {
+function guard(setup: (channel: Channel) => Promise<unknown>) {
+    return async (channel: Channel) => {
+        channel.on('error', noop);
+
+        try {
+            await setup(channel);
+        } finally {
+            channel.off('error', noop);
+        }
+    };
+}
+
+/**
+ * Reject when the broker rejects a setup function (an error with an AMQP reply code)
+ * or the channel is closed (client.close()).
+ * Errors without a reply code (connection dropped mid-setup) are transient:
+ * the setup runs again on reconnect, so keep waiting.
+ */
+function failure(channel: ChannelWrapper) : Promise<never> {
+    const promise = new Promise<never>((_resolve, reject) => {
         // ponytail: the listener stays, so setup errors after a reconnect are swallowed instead of crashing the process
-        channel.on('error', reject);
+        channel.on('error', (err: Error & { code?: unknown }) => {
+            if (typeof err.code === 'number') {
+                reject(err);
+            }
+        });
         channel.once('close', () => reject(new Error('Channel closed')));
-        channel.waitForConnect().then(resolve);
     });
+
+    // it may reject long after the call settled (e.g. close()), which is not an unhandled rejection
+    promise.catch(noop);
+
+    return promise;
 }
 
 export class Client {
@@ -62,7 +95,14 @@ export class Client {
      * Close the (shared) connection and all its channels.
      */
     async close() : Promise<void> {
+        closed.add(this.connection);
         await this.connection.close();
+    }
+
+    protected assertOpen() : void {
+        if (closed.has(this.connection)) {
+            throw new Error('The client is closed.');
+        }
     }
 
     async consume(ctx: ConsumeContext) : Promise<void>;
@@ -84,11 +124,13 @@ export class Client {
             } :
             _ctxOrFrom;
 
+        this.assertOpen();
+
         const options = ctx.options ? mergeOptions(ctx.options, this.consumeOptions) : this.consumeOptions;
         const topology = planTopology(this.exchange, ctx.from, options, true);
 
         const channel = this.connection.createChannel({
-            setup: async (ch: Channel) => {
+            setup: guard(async (ch: Channel) => {
                 const queue = await assertTopology(ch, topology) as string;
 
                 if (typeof options.prefetchCount === 'number') {
@@ -96,13 +138,13 @@ export class Client {
                 }
 
                 await ch.consume(queue, (message) => handleMessage(message, ch, ctx.handlers, options), options);
-            },
+            }),
         });
 
         try {
-            await ready(channel);
+            await Promise.race([channel.waitForConnect(), failure(channel)]);
         } catch (e) {
-            await channel.close().catch(() => undefined);
+            await channel.close().catch(noop);
             throw e;
         }
     }
@@ -126,6 +168,8 @@ export class Client {
             } :
             _toOrCtx;
 
+        this.assertOpen();
+
         const options = ctx.options ? mergeOptions(ctx.options, this.publishOptions) : this.publishOptions;
         const topology = planTopology(this.exchange, ctx.to, options);
 
@@ -137,14 +181,16 @@ export class Client {
         }
 
         // ponytail: one channel per publish (self-healing, no shared state), reuse channels when throughput matters
-        const channel = this.connection.createChannel({ setup: (ch: Channel) => assertTopology(ch, topology) });
+        const channel = this.connection.createChannel({ setup: guard((ch: Channel) => assertTopology(ch, topology)) });
+
+        // queued right away: sent once the setup ran, bounded by options.timeout, rejected by close()
+        const published = channel.publish(this.exchange.name || '', ctx.to, content, options);
+        published.catch(noop);
 
         try {
-            await ready(channel);
-
-            return await channel.publish(this.exchange.name || '', ctx.to, content, options);
+            return await Promise.race([published, failure(channel)]);
         } finally {
-            await channel.close().catch(() => undefined);
+            await channel.close().catch(noop);
         }
     }
 }

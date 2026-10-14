@@ -129,7 +129,8 @@ describe('src/module', () => {
 
         // acking inside the handler makes the second ack fail: 406 unknown delivery tag
         await other.consume('double-ack', { $any: (message, channel) => { channel.ack(message); } });
-        await other.publish('double-ack', 'fooBar');
+        // not awaited: the recycle can race the publish confirm, the publish then waits for the reconnect
+        other.publish('double-ack', 'fooBar').catch(() => undefined);
 
         // the connection is recycled, so the consumer is re-registered instead of silently dying
         await expect(disconnected).resolves.toBeDefined();
@@ -144,6 +145,58 @@ describe('src/module', () => {
         await other.close();
 
         await expect(published).rejects.toThrow('Channel closed');
+    });
+
+    it('should reject a refused consume without tearing down the connection', { timeout: 10_000 }, async () => {
+        await client.consume('exclusive', { exclusive: true }, { $any: () => {} });
+
+        // basic.consume (not a declaration) is refused: 403 ACCESS_REFUSED
+        await expect(client.consume('exclusive', { $any: () => {} })).rejects.toThrow(/ACCESS_REFUSED/);
+
+        expect(client.connection.isConnected()).toBe(true);
+        await expect(client.publish('foo', 'bar')).resolves.toBe(true);
+    });
+
+    it('should keep waiting when the connection drops during setup', { timeout: 10_000 }, async () => {
+        const other = new Client({ connection: connect(inject('MQ_CONNECTION_STRING'), { reconnectTimeInSeconds: 0.1 }) });
+        await other.publish('warmup', 'fooBar');
+
+        const { promise: received, resolve } = Promise.withResolvers<string>();
+        const consumed = other.consume('drop-during-setup', { $any: (message) => { resolve(message.content.toString()); } });
+        other.connection.reconnect();
+
+        // a transport error is not a broker rejection: consume() resolves after the reconnect
+        await expect(consumed).resolves.toBeUndefined();
+        await other.publish('drop-during-setup', 'fooBar');
+        await expect(received).resolves.toEqual('fooBar');
+        await other.close();
+    });
+
+    it('should honour the publish timeout while the broker is unreachable', { timeout: 10_000 }, async () => {
+        const other = new Client({ connection: connect('amqp://root:start123@127.0.0.1:1', { reconnectTimeInSeconds: 0.1 }) });
+
+        await expect(other.publish('unreachable', 'fooBar', { timeout: 100 })).rejects.toThrow(/timeout/i);
+        await other.close();
+    });
+
+    it('should reject calls after the client (or a sibling) is closed', { timeout: 10_000 }, async () => {
+        const other = new Client({ connectionOptions: inject('MQ_CONNECTION_STRING') });
+        const sibling = other.of({ type: 'fanout', name: 'closed-sibling' });
+
+        await other.close();
+
+        await expect(other.publish('closed', 'fooBar')).rejects.toThrow(/closed/);
+        await expect(sibling.consume('', { $any: () => {} })).rejects.toThrow(/closed/);
+    });
+
+    it('should consume a fanout exchange with an empty binding key', async () => {
+        const fanout = client.of({ type: 'fanout', name: 'broadcast' });
+        const { promise: received, resolve } = Promise.withResolvers<string>();
+
+        await fanout.consume('', { $any: (message) => { resolve(message.content.toString()); } });
+        await fanout.publish('any', 'fooBar');
+
+        await expect(received).resolves.toEqual('fooBar');
     });
 
     it('should close the connection', async () => {

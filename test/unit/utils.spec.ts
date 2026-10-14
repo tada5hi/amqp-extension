@@ -107,6 +107,19 @@ describe('src/consume/utils', () => {
         expect(channel.calls).toEqual(['ack']);
     });
 
+    it('should not ack before an async handler settles', async () => {
+        const channel = createChannel();
+        const { promise: gate, resolve } = Promise.withResolvers<void>();
+
+        const handled = handleMessage(createMessage('created'), channel, { created: () => gate }, {});
+        await Promise.resolve();
+        expect(channel.calls).toEqual([]);
+
+        resolve();
+        await handled;
+        expect(channel.calls).toEqual(['ack']);
+    });
+
     it('should fall back to $any', async () => {
         const channel = createChannel();
         const seen: string[] = [];

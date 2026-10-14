@@ -27,7 +27,7 @@ Add new decision logic here, as pure functions, rather than as more broker tests
 
 ### Broker tests (`test/unit/module.spec.ts`)
 
-No mocks or fakes. Tests run the real `Client` against a live broker. They cover delivery end to end, the `{}`-options regression, rejection on a broker-rejected declaration (406, and the connection must survive it), eager validation errors and `close()`:
+No mocks or fakes. Tests run the real `Client` against a live broker. They cover delivery end to end (incl. fanout with an empty key), the `{}`-options regression, broker rejections (406 declaration, 403 exclusive consume — the connection must survive both), a connection drop during setup (call completes after reconnect), connection recycling on a runtime channel error, the publish `timeout` during an outage, calls after `close()`, eager validation errors and `close()`. For outage scenarios inject a connection with a short retry delay: `new Client({ connection: connect(url, { reconnectTimeInSeconds: 0.1 }) })`:
 
 - `globalSetup` (`test/utils/global-setup.ts`) starts the container with user `root` / password `start123` and exposed port 5672. It hands the AMQP URL to the tests with `project.provide('MQ_CONNECTION_STRING', ...)` and returns a teardown function that stops the container. The `ProvidedContext` augmentation for this key also lives in that file.
 - Specs read the URL with `inject('MQ_CONNECTION_STRING')` from `vitest`, create a `Client` in `beforeAll`, and close `client.connection` in `afterAll`.
