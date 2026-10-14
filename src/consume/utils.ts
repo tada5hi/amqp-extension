@@ -24,7 +24,10 @@ export async function handleMessage(
         return;
     }
 
-    const handler = handlers[message.properties.type] || handlers[ConsumeHandlerAnyKey];
+    // the type is set by the publisher (untrusted): never resolve inherited properties like 'toString'
+    const { type } = message.properties;
+    const handler = (typeof type === 'string' && Object.hasOwn(handlers, type) ? handlers[type] : undefined) ||
+        handlers[ConsumeHandlerAnyKey];
 
     let ok = !!handler;
     if (handler) {

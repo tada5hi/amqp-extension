@@ -130,6 +130,18 @@ describe('src/consume/utils', () => {
         expect(channel.calls).toEqual(['ack']);
     });
 
+    it('should not dispatch to inherited properties of the handler map', async () => {
+        const channel = createChannel();
+        const seen: string[] = [];
+
+        // the type is set by the publisher, i.e. untrusted
+        await handleMessage(createMessage('toString'), channel, { $any: () => { seen.push('$any'); } }, {});
+        await handleMessage(createMessage('constructor'), channel, {}, {});
+
+        expect(seen).toEqual(['$any']);
+        expect(channel.calls).toEqual(['ack', 'nack:false']);
+    });
+
     it('should nack without requeue when no handler matches', async () => {
         const channel = createChannel();
 
