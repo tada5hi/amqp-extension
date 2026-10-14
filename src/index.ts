@@ -10,4 +10,5 @@ export * from './consume';
 export * from './exchange';
 export * from './module';
 export * from './publish';
+export * from './queue';
 export * from './type';
