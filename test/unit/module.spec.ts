@@ -5,25 +5,25 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { read } from 'envix';
+import {
+    afterAll,
+    beforeAll,
+    describe,
+    expect,
+    inject,
+    it,
+} from 'vitest';
 import { Client } from '../../src';
 
 describe('src/module', () => {
     let client: Client;
 
     beforeAll(async () => {
-        const connectionOptions = read('MQ_CONNECTION_STRING', '');
-        client = new Client({
-            connectionOptions,
-        });
+        client = new Client({ connectionOptions: inject('MQ_CONNECTION_STRING') });
     });
 
     afterAll(async () => {
         await client.connection.close();
-
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        client = undefined;
     });
 
     it('should publish message', async () => {
@@ -32,36 +32,34 @@ describe('src/module', () => {
         expect(published).toBeTruthy();
     });
 
-    it('should publish and subscribe to topic exchange', (done) => {
+    it('should publish and subscribe to topic exchange', async () => {
         const topicExchange = client.of({
             type: 'topic',
             name: 'test',
         });
 
-        Promise.resolve()
-            .then(() => topicExchange.consume('foo', {
-                $any: (message) => {
-                    const content = message.content.toString();
-                    expect(content).toEqual('fooBar');
-                    done();
-                },
-            })).then(() => {
-                topicExchange.publish('foo', 'fooBar');
-            });
+        const { promise: received, resolve } = Promise.withResolvers<string>();
+
+        await topicExchange.consume('foo', {
+            $any: (message) => {
+                resolve(message.content.toString());
+            },
+        });
+
+        await expect(topicExchange.publish('foo', 'fooBar')).resolves.toBeTruthy();
+        await expect(received).resolves.toEqual('fooBar');
     });
 
-    it('should publish and subscribe to direct exchange', (done) => {
-        Promise.resolve()
-            .then(() => client.consume('logs', { noAck: false }, {
-                $any: (message) => {
-                    const content = message.content.toString();
-                    expect(content).toEqual('fooBar');
-                    setTimeout(() => {
-                        done();
-                    }, 100);
-                },
-            })).then(() => client.publish('logs', 'fooBar', {
-                persistent: true,
-            }));
+    it('should publish and subscribe to direct exchange', async () => {
+        const { promise: received, resolve } = Promise.withResolvers<string>();
+
+        await client.consume('logs', { noAck: false }, {
+            $any: (message) => {
+                resolve(message.content.toString());
+            },
+        });
+
+        await expect(client.publish('logs', 'fooBar', { persistent: true })).resolves.toBeTruthy();
+        await expect(received).resolves.toEqual('fooBar');
     });
 });
