@@ -12,14 +12,22 @@
 ```bash
 npm run test                                                              # all tests once
 npm run test:coverage                                                     # with coverage
-npx vitest --config test/vitest.config.ts --run test/unit/module.spec.ts  # single file
+npx vitest --config test/vitest.config.ts --run test/unit/utils.spec.ts   # single file (broker-free, but globalSetup still starts the container)
 ```
 
 ## Test Layers
 
-### Integration-style unit tests
+### Broker-free tests (`test/unit/utils.spec.ts`)
 
-No mocks or fakes. Tests run the real `Client` against a live broker:
+The pure decisions are tested directly, without a broker:
+- `planTopology`: a table of exchange kind × publish/consume × options → `Topology`, plus every validation error.
+- `handleMessage`: handler/`$any` dispatch and the ack/nack/requeue/`noAck` table, using a two-method `{ ack, nack }` fake that records calls (no `vi.fn`). Also: no rejection when `ack` throws on a closed channel.
+
+Add new decision logic here, as pure functions, rather than as more broker tests.
+
+### Broker tests (`test/unit/module.spec.ts`)
+
+No mocks or fakes. Tests run the real `Client` against a live broker. They cover delivery end to end, the `{}`-options regression, rejection on a broker-rejected declaration (406, and the connection must survive it), eager validation errors and `close()`:
 
 - `globalSetup` (`test/utils/global-setup.ts`) starts the container with user `root` / password `start123` and exposed port 5672. It hands the AMQP URL to the tests with `project.provide('MQ_CONNECTION_STRING', ...)` and returns a teardown function that stops the container. The `ProvidedContext` augmentation for this key also lives in that file.
 - Specs read the URL with `inject('MQ_CONNECTION_STRING')` from `vitest`, create a `Client` in `beforeAll`, and close `client.connection` in `afterAll`.
@@ -27,7 +35,7 @@ No mocks or fakes. Tests run the real `Client` against a live broker:
 
 ## Code Coverage
 
-Thresholds in `test/vitest.config.ts` are 80% for branches, functions, lines and statements, measured over `src/**`. The current suite does **not** meet them, so `npm run test:coverage` fails. CI runs `npm run test` only.
+Thresholds in `test/vitest.config.ts` are 80% for branches, functions, lines and statements, measured over `src/**`. The suite meets them (~96% lines, ~93% branches). CI runs `npm run test` only.
 
 ## CI Pipeline
 

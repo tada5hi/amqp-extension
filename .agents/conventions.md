@@ -38,7 +38,7 @@ TypeScript is pinned to 6.x because `typescript-eslint` does not support TS 7 ye
 |-----------------|------------------------------------------------|-------------------------------------------------|
 | `*Options`      | Options passed to broker calls, mostly `amqplib` `Options.*` aliases/extensions | `PublishOptions`, `ConsumeOptions`, `ExchangeOptions` |
 | `*Context`      | Object-form input for a method or constructor  | `ClientContext`, `ConsumeContext`, `PublishContext` |
-| `is*`           | Type guards                                    | `isConsumeHandlers`, `isExchange`, `isDefaultExchange` |
+| `is*`           | Type guards                                    | `isDefaultExchange` |
 | Enum + template literal | Accept enum values as plain strings    | `type: \`${ExchangeType}\`` |
 
 ## File Organization
@@ -96,5 +96,6 @@ Config: `release-please-config.json` (`release-type: node`, `include-v-in-tag: t
 
 - Reuse `amqplib` option types (amqplib bundles its own `.d.ts`; there is no `@types/amqplib`) instead of redefining them. Extend them with intersections (`Options.Consume & { ... }`).
 - Keep `Client` methods overload-compatible: positional form plus context-object form, with defaults merged through `mergeOptions`.
-- Put broker assertions inside the `createChannel({ setup })` callback so they replay after a reconnect.
+- Put broker assertions inside the `createChannel({ setup })` callback (via `assertTopology`) so they replay after a reconnect. Validate with `planTopology` **before** opening a channel.
+- Keep decisions pure and broker-free where possible (`planTopology`, `handleMessage`), and test them in `test/unit/utils.spec.ts`. Never tell overload arguments apart by an object's shape; use the argument count.
 - Study the surrounding patterns before adding code, and keep the public surface small.

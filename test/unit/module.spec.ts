@@ -93,4 +93,41 @@ describe('src/module', () => {
         expect(active).toEqual(sent);
         expect(passive).toEqual([]);
     });
+
+    it('should use the handlers when empty options are passed', async () => {
+        const { promise: received, resolve } = Promise.withResolvers<string>();
+
+        await client.consume('empty-options', {}, { $any: (message) => { resolve(message.content.toString()); } });
+        await client.publish('empty-options', 'fooBar');
+
+        await expect(received).resolves.toEqual('fooBar');
+    });
+
+    it('should reject when the broker rejects the topology', { timeout: 10_000 }, async () => {
+        await client.consume('mismatch', { singleActiveConsumer: true }, { $any: () => {} });
+
+        await expect(client.publish('mismatch', 'fooBar')).rejects.toThrow(/PRECONDITION_FAILED/);
+        await expect(client.consume('mismatch', { $any: () => {} })).rejects.toThrow(/PRECONDITION_FAILED/);
+
+        // only the failing channel closed, the connection keeps working
+        expect(client.connection.isConnected()).toBe(true);
+        await expect(client.publish('foo', 'bar')).resolves.toBe(true);
+    });
+
+    it('should reject invalid input before opening a channel', async () => {
+        const nameless = client.of({ type: 'topic' });
+
+        await expect(nameless.consume('foo', { $any: () => {} })).rejects.toThrow(SyntaxError);
+        await expect(nameless.publish('foo', 'bar')).rejects.toThrow(SyntaxError);
+        await expect(client.of({ type: 'topic', name: 'test' }).publish('', 'bar')).rejects.toThrow(SyntaxError);
+    });
+
+    it('should close the connection', async () => {
+        const other = new Client({ connectionOptions: inject('MQ_CONNECTION_STRING') });
+        await other.publish('close', 'fooBar');
+
+        await other.close();
+
+        expect(other.connection.isConnected()).toBe(false);
+    });
 });

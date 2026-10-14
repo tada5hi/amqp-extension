@@ -4,7 +4,7 @@
 
 A thin facade over `amqp-connection-manager`. One `Client` holds the following:
 
-- `connection`: either injected (`ctx.connection`) or created via `connect(ctx.connectionOptions, { reconnectTimeInSeconds: 60 })`. A self-created connection registers a `SIGINT` handler that closes it.
+- `connection`: either injected (`ctx.connection`) or created via `connect(ctx.connectionOptions, { reconnectTimeInSeconds: 60 })`. `client.close()` closes it, together with every channel and every `of()` sibling sharing it. There is no automatic close on `SIGINT`: the app owns the process.
 - `publishOptions` / `consumeOptions`: client-level defaults.
 - `exchange`: defaults to `{ type: 'direct', name: '' }`, which is the AMQP **default exchange**.
 
@@ -14,7 +14,7 @@ A thin facade over `amqp-connection-manager`. One `Client` holds the following:
 
 ### 1. `direct` type means the default exchange
 
-`isDefaultExchange(type)` is true for `undefined` or `'direct'`. In that mode, `to`/`from` is a **queue name**: the queue is asserted with `buildAssertQueueOptions(options)` (always `durable: true`; `singleActiveConsumer` adds the `x-single-active-consumer` argument) and messages are published to exchange `''` with the queue name as routing key. An empty queue name throws. Queue options (`QueueOptions`, currently `singleActiveConsumer`) are intersected flat into both `PublishOptions` and `ConsumeOptions`, and publisher and consumer must pass the same values, because the broker rejects re-declaring a queue with different arguments. Named exchanges ignore it.
+`isDefaultExchange(type)` is true for `undefined` or `'direct'`. In that mode, `to`/`from` is a **queue name**: the queue is asserted durably (always `durable: true`; `singleActiveConsumer` adds the `x-single-active-consumer` argument) and messages are published to exchange `''` with the queue name as routing key. An empty queue name throws. Queue options (`QueueOptions`, currently `singleActiveConsumer`) are intersected flat into both `PublishOptions` and `ConsumeOptions`, and publisher and consumer must pass the same values, because the broker rejects re-declaring a queue with different arguments. Named exchanges ignore it.
 
 ### 2. Named exchanges use an exclusive, temporary queue per consumer
 
@@ -23,11 +23,21 @@ For every non-default type (`topic`, `fanout`, `match`), `consume(from, ...)` do
 2. Asserts an anonymous queue `{ durable: false, autoDelete: true, exclusive: true }`.
 3. Binds it with `from` as the routing key / binding pattern.
 
-`publish` on a named exchange requires `exchange.name` (otherwise it throws a `SyntaxError`) and asserts the exchange before publishing.
+`publish` on a named exchange asserts only the exchange. A named exchange type without `exchange.name` is rejected (`SyntaxError`) for both publish and consume.
 
-### 3. Setup happens inside `createChannel({ setup })`
+### 3. Topology is planned as data, declared inside `createChannel({ setup })`
 
-All assertions run in the channel `setup` callback, so they replay automatically after a reconnect. `consume` resolves on `channel.waitForConnect()`. `publish` creates a short-lived channel, publishes, then closes it.
+`planTopology(exchange, key, options, consume?)` (`src/queue/utils.ts`) is pure. It returns a `Topology` (`{ exchange?, queue?, bind? }`) and throws on invalid input (an empty queue name on the default exchange, a nameless named exchange, an empty publish key on a named exchange) **before any channel is opened**. `assertTopology(channel, topology)` declares it and is only ever called from a channel `setup` callback, so it replays automatically after a reconnect.
+
+`assertTopology` also attaches a no-op `'error'` listener to the raw amqplib channel. amqp-connection-manager doesn't, and without it amqplib rethrows a channel-level error (e.g. a 406 on a mismatched queue declaration) and tears down the **whole connection**, which then reconnects only after 60 s.
+
+### 4. Setup failures reject the call
+
+`publish` and `consume` wait with `ready(wrapper)`, which resolves on `waitForConnect()` and rejects on the wrapper's `'error'` event, i.e. when a setup function fails. A failed `consume` closes its channel. The listener stays attached, so setup errors after a later reconnect are swallowed instead of crashing the process (`ponytail:` ceiling: no `onError` hook yet).
+
+### 5. One channel per publish
+
+`publish` opens a channel, waits for `ready`, publishes and closes the channel in `finally`. That is self-healing and needs no shared state. A long-lived publish channel is deliberately avoided: under amqp-connection-manager 5 one rejected declaration would disable it until the connection reconnects. `ponytail:` ceiling: throughput.
 
 ## Design Patterns
 
@@ -45,21 +55,21 @@ async publish(to: string, data: any): Promise<boolean>;
 async publish(to: string, data: any, options: PublishOptions): Promise<boolean>;
 ```
 
-The implementation tells the forms apart with `typeof arg === 'string'`. It tells `options` and `handlers` apart with `isConsumeHandlers()`, which is true when every value is a function. `*Context` types (`ConsumeContext`, `PublishContext`, `ClientContext`) are the object-form inputs. `*Options` types extend `amqplib` `Options.*`.
+The implementation tells the forms apart with `typeof arg === 'string'`, and `options` from `handlers` **by argument count**: with three arguments the second is `options`. Never guess from an object's shape (the removed `isConsumeHandlers({})` returned `true`, so `consume('q', {}, handlers)` ignored the handlers). `*Context` types (`ConsumeContext`, `PublishContext`, `ClientContext`) are the object-form inputs. `*Options` types extend `amqplib` `Options.*`.
 
 ### Option merging
 
 Call-site options are merged on top of client defaults:
 
 ```typescript
-options = mergeOptions(callOptions, this.consumeOptions); // left (call-site) wins
+options = ctx.options ? mergeOptions(ctx.options, this.consumeOptions) : this.consumeOptions; // left (call-site) wins
 ```
 
-`mergeOptions` clones without mutating its inputs and dedupes arrays. It does not deep-merge an `exchange` key: when both sides hold an `Exchange`, the left one wins.
+`mergeOptions` (smob) deep-merges, clones without mutating its inputs and dedupes arrays. It only runs when call options are passed: its clone turns a `Buffer` (e.g. in `headers`) into a plain `Uint8Array`, which amqplib no longer encodes as bytes.
 
-### Handler dispatch
+### Handler dispatch and settlement
 
-`ConsumeHandlers` maps `message.properties.type` to a handler. The `'$any'` key (`ConsumeHandlerAnyKey`) is the fallback.
+`handleMessage(message, channel, handlers, options)` (`src/consume/utils.ts`, internal) owns the whole policy: `ConsumeHandlers` maps `message.properties.type` to a handler, `'$any'` (`ConsumeHandlerAnyKey`) is the fallback, and the delivery is acked or nacked. It needs only `{ ack, nack }` from the channel, so it is tested broker-free. It never rejects: amqplib discards the consumer callback's promise, so a rejection would be unhandled.
 
 ## Data Flow
 
@@ -67,14 +77,15 @@ options = mergeOptions(callOptions, this.consumeOptions); // left (call-site) wi
 publish(to, data, options?)
   1. Merge options with client publishOptions
   2. Serialize: Buffer as-is · string → utf-8 · anything else → JSON.stringify
-  3. Channel setup: assert queue (default exchange) or assert exchange (named)
-  4. channel.publish(exchange.name || '', to, buffer, options) → boolean; close channel
+  3. planTopology (validation, throws before any channel exists)
+  4. createChannel({ setup: assertTopology }) → ready() (rejects on setup failure)
+  5. channel.publish(exchange.name || '', to, buffer, options) → boolean; close channel (finally)
 
 consume(from, options?, handlers)
   1. Merge options with client consumeOptions
-  2. Channel setup: assert queue (default exchange) or exchange + exclusive queue + bind
-  3. Apply prefetchCount if it is a number
-  4. channel.consume(queue, handleMessage, options)
+  2. planTopology(…, consume = true) (validation, throws before any channel exists)
+  3. Channel setup: assertTopology → prefetch(prefetchCount) → channel.consume(queue, handleMessage, options)
+  4. ready() resolves, or rejects (and closes the channel) on setup failure
   5. handleMessage: pick handler by properties.type or $any → await → ack; on throw/no handler → nack
 ```
 
@@ -82,7 +93,9 @@ consume(from, options?, handlers)
 
 - Ack/nack happens only when `options.noAck` is falsy.
 - When no handler matches, or a handler throws, the message is `nack`ed with `requeue = options.requeueOnFailure ?? false`. Handler errors are swallowed and not rethrown or logged.
-- Configuration errors (empty queue name on the default exchange, missing exchange name, missing publish destination) throw `Error` / `SyntaxError`.
+- An `ack`/`nack` that throws because the channel closed while the handler ran (reconnect) is swallowed. The broker redelivers the message.
+- Configuration errors (empty queue name on the default exchange, missing exchange name, missing publish destination) reject `publish`/`consume` with `Error` / `SyntaxError` before any channel is opened.
+- Broker rejections of a declaration (e.g. 406 `PRECONDITION_FAILED`) reject `publish`/`consume`. Only that channel closes, and the connection stays up.
 
 ## Configuration
 
