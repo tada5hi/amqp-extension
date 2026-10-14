@@ -48,8 +48,8 @@ amqp-extension/
 | `src/type.ts`     | `ClientContext` (constructor input), `Connection` (`ReturnType<typeof connect>`)                     |
 | `src/utils.ts`    | `mergeOptions`: deep merge where the call-site options win; keeps an `exchange` object whole (no deep merge) |
 | `src/consume/`    | Consume option and handler types, `$any` fallback key, handler-map type guard                       |
-| `src/publish/`    | Publish option/context types (`amqplib` `Options.Publish` + `queueOptions`)                           |
-| `src/queue/`      | `QueueOptions` for the named queue of the default exchange, mapped to `assertQueue` options/arguments |
+| `src/publish/`    | Publish option/context types (`amqplib` `Options.Publish` & `QueueOptions`)                          |
+| `src/queue/`      | `QueueOptions` (flat on consume/publish options) for the default-exchange queue, mapped to `assertQueue` options/arguments |
 | `src/exchange/`   | `ExchangeType` enum, `Exchange` shape, default-exchange detection                                  |
 | `src/config/`     | `buildConfig()` from the older API. Still exported but unused internally, kept for compatibility    |
 

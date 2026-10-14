@@ -139,7 +139,7 @@ export class Client {
                         throw new Error('The queue name can not be empty if the default exchange is selected.');
                     }
 
-                    await channel.assertQueue(queueName, buildAssertQueueOptions(options.queueOptions));
+                    await channel.assertQueue(queueName, buildAssertQueueOptions(options));
                 } else {
                     await channel.assertExchange(
                         this.exchange.name || '',
@@ -232,7 +232,7 @@ export class Client {
                         throw new Error('The queue name can not be empty if the default exchange is selected.');
                     }
 
-                    await channel.assertQueue(to, buildAssertQueueOptions(options.queueOptions));
+                    await channel.assertQueue(to, buildAssertQueueOptions(options));
 
                     return;
                 }

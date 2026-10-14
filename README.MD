@@ -180,11 +180,11 @@ const client = new Client({
 | `requeueOnFailure` | consume | `false` | Requeue messages that are `nack`ed because a handler threw or none matched |
 | `prefetchCount` | consume | — | Maximum number of unacknowledged messages per consumer (`channel.prefetch`) |
 | `noAck` | consume | `false` | amqplib option. When `true`, no `ack`/`nack` is sent at all |
-| `queueOptions` | both | — | Options of the named queue on the default exchange (see below) |
+| `singleActiveConsumer` | both | `false` | Declare the default-exchange queue as single active consumer (see below) |
 
 ### Queue options
 
-On the default exchange, `consume` and `publish` assert a named, durable queue, and `queueOptions` configures it. `singleActiveConsumer` delivers to one consumer at a time, in publish order, and fails over to another when it goes away. The broker rejects re-declaring a queue with different arguments, so publisher and consumer must pass the same options.
+On the default exchange, `consume` and `publish` assert a named, durable queue. Queue options are set flat on the publish/consume options, and named exchanges ignore them. `singleActiveConsumer` delivers to one consumer at a time, in publish order, and fails over to another when it goes away. The broker rejects re-declaring a queue with different arguments, so publisher and consumer must pass the same options.
 
 ```typescript
 import { Client } from 'amqp-extension';
@@ -194,13 +194,11 @@ const client = new Client({
     connectionOptions: 'amqp://<user>:<password>@<host>',
 });
 
-const queueOptions = { singleActiveConsumer: true };
-
-await client.consume('<queue>', { queueOptions, prefetchCount: 1 }, {
+await client.consume('<queue>', { singleActiveConsumer: true, prefetchCount: 1 }, {
     $any: async (message) => { /* ... */ },
 });
 
-await client.publish('<queue>', { foo: 'bar' }, { queueOptions });
+await client.publish('<queue>', { foo: 'bar' }, { singleActiveConsumer: true });
 ```
 
 ## API
@@ -212,7 +210,7 @@ await client.publish('<queue>', { foo: 'bar' }, { queueOptions });
 | `ExchangeType` | enum | `direct` (default exchange), `topic`, `fanout`, `match` |
 | `ConsumeHandlers` | type | Map from message `type` to handler, with the `$any` fallback key |
 | `ConsumeOptions` / `PublishOptions` | type | amqplib options plus the extensions listed above |
-| `QueueOptions` | type | `{ singleActiveConsumer?: boolean }` |
+| `QueueOptions` | type | `{ singleActiveConsumer?: boolean }`, part of both `ConsumeOptions` and `PublishOptions` |
 | `ConsumeMessage` | type | Re-export of amqplib's message type |
 
 ## Notes

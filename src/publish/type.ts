@@ -8,12 +8,7 @@
 import type { Options } from 'amqplib';
 import type { QueueOptions } from '../queue';
 
-export type PublishOptions = Options.Publish & {
-    /**
-     * Options of the named queue asserted for the default exchange.
-     */
-    queueOptions?: QueueOptions
-};
+export type PublishOptions = Options.Publish & QueueOptions;
 export type PublishContext = {
     to: string,
     data: any,
