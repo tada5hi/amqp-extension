@@ -14,7 +14,7 @@ A thin facade over `amqp-connection-manager`. One `Client` holds the following:
 
 ### 1. `direct` type means the default exchange
 
-`isDefaultExchange(type)` is true for `undefined` or `'direct'`. In that mode, `to`/`from` is a **queue name**: the queue is asserted durably (always `durable: true`; `singleActiveConsumer` adds the `x-single-active-consumer` argument) and messages are published to exchange `''` with the queue name as routing key. An empty queue name throws. Queue options (`QueueOptions`, currently `singleActiveConsumer`) are intersected flat into both `PublishOptions` and `ConsumeOptions`, and publisher and consumer must pass the same values, because the broker rejects re-declaring a queue with different arguments. Named exchanges ignore it.
+`isDefaultExchange(type)` is true for `undefined` or `'direct'`. In that mode, `to`/`from` is a **queue name**: the queue is asserted durably (always `durable: true`) and messages are published to exchange `''` with the queue name as routing key. An empty queue name throws. Queue options (`QueueOptions`: `queueType`, `deliveryLimit`, `deadLetterExchange`, `deadLetterRoutingKey`, `messageTtl`, `maxLength`, `singleActiveConsumer`) are intersected flat into both `PublishOptions` and `ConsumeOptions`. `planTopology` maps them to `x-*` queue arguments through one key→argument map (`QueueArguments` in `src/queue/utils.ts`); `undefined` and `false` add no argument, and no options means no `arguments` key at all. Nothing is validated client-side: the broker answers a bad combination with a 406 (`BrokerError`). Publisher and consumer must pass the same values, because the broker rejects re-declaring a queue with different arguments. Named exchanges ignore them.
 
 ### 2. Named exchanges use an exclusive, temporary queue per consumer
 
@@ -112,4 +112,4 @@ consume(from, options?, handlers)
 | `connectionOptions` | `amqplib` `Options.Connect` or URL string, used when no `connection` is given |
 | `exchange`          | `{ type, name?, options? }`. Defaults to the default exchange   |
 | `publishOptions`    | Defaults merged into every `publish`                           |
-| `consumeOptions`    | Defaults merged into every `consume`. Extra fields: `requeueOnFailure`, `prefetchCount`, `singleActiveConsumer` |
+| `consumeOptions`    | Defaults merged into every `consume`. Extra fields: `requeueOnFailure`, `prefetchCount` and the `QueueOptions` |

@@ -212,12 +212,26 @@ const client = new Client({
 | `requeueOnFailure` | consume | `false` | Requeue messages that are `nack`ed because a handler threw or none matched |
 | `prefetchCount` | consume | none | Maximum number of unacknowledged messages per consumer (`channel.prefetch`) |
 | `noAck` | consume | `false` | amqplib option. When `true`, no `ack`/`nack` is sent at all |
-| `singleActiveConsumer` | both | `false` | Declare the default-exchange queue as single active consumer (see below) |
+| Queue options | both | none | `queueType`, `deliveryLimit`, `deadLetterExchange`, `deadLetterRoutingKey`, `messageTtl`, `maxLength`, `singleActiveConsumer` (see below) |
 | `timeout` | publish | none | Milliseconds to wait for the broker to take the message before rejecting with a `ClientError` (`PUBLISH_TIMEOUT`), e.g. while it is unreachable. Without it the call waits for the reconnect |
 
 ### Queue options
 
-On the default exchange, `consume` and `publish` assert a named, durable queue. Queue options are set flat on the publish/consume options, and named exchanges ignore them. `singleActiveConsumer` delivers to one consumer at a time, in publish order, and fails over to another when it goes away. The broker rejects re-declaring a queue with different arguments, so publisher and consumer must pass the same options.
+On the default exchange, `consume` and `publish` assert a named, durable queue. Queue options are set flat on the publish/consume options and map to queue arguments. Named exchanges ignore them.
+
+| Option | Queue argument | Purpose |
+|---|---|---|
+| `queueType` | `x-queue-type` | `'classic'` or `'quorum'` |
+| `deliveryLimit` | `x-delivery-limit` | Drop or dead-letter a message after this many failed deliveries (quorum queues only). Counts only requeued messages: needs `requeueOnFailure: true`, otherwise a failed message is dropped or dead-lettered on its first failure |
+| `deadLetterExchange` | `x-dead-letter-exchange` | Exchange that rejected or expired messages are republished to |
+| `deadLetterRoutingKey` | `x-dead-letter-routing-key` | Routing key for dead-lettered messages |
+| `messageTtl` | `x-message-ttl` | Expire messages after this many milliseconds in the queue |
+| `maxLength` | `x-max-length` | Maximum number of ready messages, the oldest are dropped or dead-lettered beyond it |
+| `singleActiveConsumer` | `x-single-active-consumer` | Deliver to one consumer at a time, in publish order, and fail over to another when it goes away |
+
+They are not validated client-side: the broker rejects an invalid combination with a `BrokerError`. It also rejects re-declaring a queue with different arguments, so publisher and consumer must pass the same options.
+
+Await the first `consume` (or `publish`) of a new quorum queue before running publisher and consumer concurrently: RabbitMQ 3.13 can crash the channel when a quorum queue is consumed while another channel is still creating it, which drops the connection until it reconnects. Concurrent first publishes to it can also be rejected (`message nacked`) and need a retry.
 
 ```typescript
 import { Client } from 'amqp-extension';
@@ -227,11 +241,13 @@ const client = new Client({
     connectionOptions: 'amqp://<user>:<password>@<host>',
 });
 
-await client.consume('<queue>', { singleActiveConsumer: true, prefetchCount: 1 }, {
+const queueOptions = { queueType: 'quorum', singleActiveConsumer: true } as const;
+
+await client.consume('<queue>', { ...queueOptions, prefetchCount: 1 }, {
     $any: async (message) => { /* ... */ },
 });
 
-await client.publish('<queue>', { foo: 'bar' }, { singleActiveConsumer: true });
+await client.publish('<queue>', { foo: 'bar' }, queueOptions);
 ```
 
 ## API
@@ -243,7 +259,7 @@ await client.publish('<queue>', { foo: 'bar' }, { singleActiveConsumer: true });
 | `ExchangeType` | enum | `direct` (default exchange), `topic`, `fanout`, `match` |
 | `ConsumeHandlers` | type | Map from message `type` to handler, with the `$any` fallback key |
 | `ConsumeOptions` / `PublishOptions` | type | amqplib options plus the extensions listed above |
-| `QueueOptions` | type | `{ singleActiveConsumer?: boolean }`, part of both `ConsumeOptions` and `PublishOptions` |
+| `QueueOptions` | type | Queue arguments (`queueType`, `deliveryLimit`, `deadLetterExchange`, `deadLetterRoutingKey`, `messageTtl`, `maxLength`, `singleActiveConsumer`), part of both `ConsumeOptions` and `PublishOptions` |
 | `ConsumeMessage` | type | Re-export of amqplib's message type |
 | `AmqpExtensionError`, `TopologyError`, `ClientError`, `BrokerError`, `SerializationError` | class | Error tree, see [Errors](#errors) |
 | `ErrorCode` | enum | Stable error codes |
@@ -252,7 +268,7 @@ await client.publish('<queue>', { foo: 'bar' }, { singleActiveConsumer: true });
 ## Notes
 
 - **Close the client when you are done:** `await client.close()`. It closes the shared connection, so every `of()` sibling stops too. Nothing is closed automatically on `SIGINT`; hook it into your app's shutdown, e.g. `process.once('SIGTERM', () => client.close())`. For scoped code (scripts, jobs, tests) use `await using client = new Client(...)`: the client closes when the scope ends, also on a throw. Disposal runs at scope exit, not on a signal, and like `close()` it closes the shared connection, so use it on the root client rather than on `of()` siblings.
-- **Broker errors reject the call.** If the broker rejects the setup, e.g. `PRECONDITION_FAILED` for a queue re-declared with different `singleActiveConsumer` arguments or `ACCESS_REFUSED` for a queue that is already consumed exclusively, `publish()` / `consume()` reject with a `BrokerError` (the amqplib error is its `cause`). Only that channel closes; the connection stays up. A connection that merely drops during the call is not an error: the call completes after the reconnect (`publish` is bounded by its `timeout` option).
+- **Broker errors reject the call.** If the broker rejects the setup, e.g. `PRECONDITION_FAILED` for a queue re-declared with different queue options or `ACCESS_REFUSED` for a queue that is already consumed exclusively, `publish()` / `consume()` reject with a `BrokerError` (the amqplib error is its `cause`). Only that channel closes; the connection stays up. A connection that merely drops during the call is not an error: the call completes after the reconnect (`publish` is bounded by its `timeout` option).
 - **Calls after `close()` reject** with a `ClientError` (`CLIENT_CLOSED`), also on `of()` siblings.
 - **A consumer cancelled by the broker stays cancelled**, e.g. when its queue is deleted. Call `consume()` again after re-creating the queue.
 - **Invalid input rejects before anything touches the broker:** an empty queue name on the default exchange, a named exchange type without a `name`, or an empty routing key when publishing to a named exchange, with a `TopologyError`.

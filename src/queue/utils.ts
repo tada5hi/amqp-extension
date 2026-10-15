@@ -12,6 +12,31 @@ import { isDefaultExchange } from '../exchange';
 import type { QueueOptions, Topology } from './types';
 
 
+const QueueArguments = {
+    queueType: 'x-queue-type',
+    deliveryLimit: 'x-delivery-limit',
+    deadLetterExchange: 'x-dead-letter-exchange',
+    deadLetterRoutingKey: 'x-dead-letter-routing-key',
+    messageTtl: 'x-message-ttl',
+    maxLength: 'x-max-length',
+    singleActiveConsumer: 'x-single-active-consumer',
+} as const satisfies Record<keyof QueueOptions, string>;
+
+function planQueueOptions(options: QueueOptions) : Options.AssertQueue {
+    const queueOptions : Options.AssertQueue = { durable: true };
+
+    const keys = Object.keys(QueueArguments) as (keyof QueueOptions)[];
+    for (const key of keys) {
+        const value = options[key];
+        // false is left out like undefined, so a queue declared without the option stays equivalent
+        if (typeof value !== 'undefined' && value !== false) {
+            queueOptions.arguments = { ...queueOptions.arguments, [QueueArguments[key]]: value };
+        }
+    }
+
+    return queueOptions;
+}
+
 /**
  * Plan the topology for publishing to or consuming from (consume = true) a key.
  * Throws on invalid input, before anything touches the broker.
@@ -27,12 +52,7 @@ export function planTopology(
             throw TopologyError.queueNameEmpty();
         }
 
-        const queueOptions : Options.AssertQueue = { durable: true };
-        if (options.singleActiveConsumer) {
-            queueOptions.arguments = { 'x-single-active-consumer': true };
-        }
-
-        return { queue: { name: key, options: queueOptions } };
+        return { queue: { name: key, options: planQueueOptions(options) } };
     }
 
     if (!exchange.name) {

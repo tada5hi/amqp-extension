@@ -33,6 +33,27 @@ describe('src/queue/utils', () => {
             });
     });
 
+    it.each([
+        [{ queueType: 'quorum' }, { 'x-queue-type': 'quorum' }],
+        [{ deliveryLimit: 3 }, { 'x-delivery-limit': 3 }],
+        [{ deadLetterExchange: 'dlx' }, { 'x-dead-letter-exchange': 'dlx' }],
+        [{ deadLetterRoutingKey: 'dead' }, { 'x-dead-letter-routing-key': 'dead' }],
+        [{ messageTtl: 0 }, { 'x-message-ttl': 0 }],
+        [{ maxLength: 10 }, { 'x-max-length': 10 }],
+        [{ singleActiveConsumer: true, queueType: 'quorum' }, { 'x-single-active-consumer': true, 'x-queue-type': 'quorum' }],
+    ] as const)('should map %o to queue arguments', (options, args) => {
+        expect(planTopology({ type: 'direct' }, 'jobs', options).queue)
+            .toEqual({ name: 'jobs', options: { durable: true, arguments: args } });
+    });
+
+    it('should add no queue arguments for unset or disabled options', () => {
+        expect(planTopology({ type: 'direct' }, 'jobs', {
+            queueType: undefined,
+            messageTtl: undefined,
+            singleActiveConsumer: false,
+        }).queue).toEqual({ name: 'jobs', options: { durable: true } });
+    });
+
     it('should plan only the exchange for publishing to a named exchange', () => {
         expect(planTopology(topic, 'user.created', {}))
             .toEqual({
