@@ -33,6 +33,16 @@ export type ConsumeOptions = Options.Consume & QueueOptions & {
     prefetchCount?: number,
 
     /**
+     * Named exchanges only: consume through this durable, named queue instead of
+     * an exclusive, temporary one. Once declared by a consume, it keeps messages while
+     * no consumer runs, and consumers sharing it split the messages. An empty name
+     * throws. Ignored on the default exchange.
+     *
+     * Default: undefined
+     */
+    queue?: string,
+
+    /**
      * Called after a message was nacked (or not settled, with noAck) because its handler threw
      * (with that error) or no handler matched (with a ClientError, code HANDLER_MISSING).
      * Its own errors are swallowed.

@@ -188,7 +188,8 @@ export class Client {
             try {
                 await Promise.race([channel.waitForConnect(), failure(channel)]);
             } catch (e) {
-                await channel.close().catch(noop);
+                // not awaited: amqplib never settles the close when the connection drops before close-ok
+                channel.close().catch(noop);
                 throw e;
             }
 
@@ -278,7 +279,8 @@ export class Client {
             try {
                 return await Promise.race([published, failure(channel)]);
             } finally {
-                await channel.close().catch(noop);
+                // not awaited, see consume()
+                channel.close().catch(noop);
             }
         } catch (e) {
             throw toError(e);
