@@ -180,6 +180,45 @@ await consumer.cancel();
 
 Both methods also accept a single context object: `client.publish({ to, data, options })`, `client.consume({ from, options, handlers })`.
 
+### Retry & redelivery
+
+By default a failed message is `nack`ed once and dropped (or requeued with `requeueOnFailure`). Pass `retry` to retry it instead:
+
+```typescript
+await client.consume('jobs', {
+    prefetchCount: 1,
+    retry: { maxAttempts: 5, delay: 1_000 },
+    onError: (error) => logger.warn(error),
+}, {
+    $any: async (message) => { /* ... */ },
+});
+```
+
+When a handler throws, the message is re-published to the queue it came from (through the default exchange, by queue name) with its content and properties, and the next attempt in the `x-attempt` header (1-based: a first delivery has none and counts as attempt 1). The original is acked once the broker confirmed the copy. Attempt `n` waits `delay * 2^(n - 2)` ms before it is re-published (1s, 2s, 4s, ... with the defaults), capped at 30s.
+
+| Option | Default | Purpose |
+|---|---|---|
+| `retry.maxAttempts` | `5` | Delivery attempts before the message is dropped: it is acked and `onError` receives a `ClientError` (`ATTEMPTS_EXHAUSTED`) with the last handler error as `cause` |
+| `retry.delay` | `1000` | Base of the exponential backoff in ms |
+| `ordered` | `false` | See the redelivery guard below |
+
+- **Delivery is at-least-once.** A crash between the re-publish and the ack delivers the message twice; make handlers idempotent.
+- **There is no dead-letter queue.** An exhausted message is dropped, so log it in `onError` if it must be replayed.
+- **The backoff holds the prefetch slot.** With `prefetchCount: 1` the consumer handles nothing else while it waits, so keep `delay` in seconds.
+- **A re-published message goes to the end of the queue**, so a retried message can be handled after a later one.
+- **A missing or invalid `x-attempt` header counts as attempt 1**, so a publisher that counts attempts elsewhere at worst gets more retries, never fewer.
+- A missing handler is not retried, and `retry` has no effect with `noAck`.
+- If the re-publish itself fails (e.g. the broker is unreachable), the original is `nack`ed with requeue and comes back as a redelivery.
+- `onError` is called after every failed attempt with the handler's error, and once with `ATTEMPTS_EXHAUSTED` when the message is dropped.
+- The message's `userId` is not copied: the broker rejects one that is not the re-publishing connection's user.
+
+With `retry`, messages carrying a `messageId` are also guarded against redeliveries:
+
+- A redelivered copy of a message this consumer is **still handling** (its channel was reset, e.g. on a reconnect, while the handler ran) is not run again. It is acked right away, or, with `ordered: true`, only once the original has settled. Acking it early frees the prefetch slot, so on a `singleActiveConsumer` queue the next message would run next to the original.
+- A redelivered message this consumer is **not** handling means a consumer died while handling it (a crash, the broker's `consumer_timeout`). It counts as a failed attempt and is retried without running the handler first.
+
+The guard is per `consume()` call: a redelivery that lands on another consumer or process runs again. Messages without a `messageId` are not guarded.
+
 ### Multiple exchanges
 
 `of(exchange)` returns a client bound to another exchange. It shares the same connection and default options.
@@ -212,7 +251,7 @@ Pass `queue` per call rather than in the client's `consumeOptions`: a default ap
 | Class | `code` |
 |---|---|
 | `TopologyError` | `QUEUE_NAME_EMPTY`, `EXCHANGE_NAME_MISSING`, `DESTINATION_MISSING` |
-| `ClientError` | `CLIENT_CLOSED`, `CHANNEL_CLOSED`, `PUBLISH_TIMEOUT`, `HANDLER_MISSING` (passed to `onError` only) |
+| `ClientError` | `CLIENT_CLOSED`, `CHANNEL_CLOSED`, `PUBLISH_TIMEOUT`, `HANDLER_MISSING` and `ATTEMPTS_EXHAUSTED` (passed to `onError` only) |
 | `BrokerError` | `BROKER_REJECTED`, with the AMQP reply code as `replyCode` |
 | `SerializationError` | `SERIALIZATION_FAILED` |
 
@@ -256,6 +295,8 @@ const client = new Client({
 | `queue` | consume | none | Named exchanges only: consume through this durable, named queue instead of a temporary one (see [Multiple exchanges](#multiple-exchanges)) |
 | `prefetchCount` | consume | none | Maximum number of unacknowledged messages per consumer (`channel.prefetch`) |
 | `noAck` | consume | `false` | amqplib option. When `true`, no `ack`/`nack` is sent at all |
+| `retry` | consume | none | `{ maxAttempts?, delay? }`: retry messages whose handler threw (see [Retry & redelivery](#retry--redelivery)) |
+| `ordered` | consume | `false` | With `retry`: hold a redelivered copy of a message still being handled until the original settles |
 | `onError` | consume | none | `(error, message) => void \| Promise<void>`, called when a handler threw or none matched (also with `noAck`). A call-site `onError` replaces the client default |
 | Queue options | both | none | `queueType`, `deliveryLimit`, `deadLetterExchange`, `deadLetterRoutingKey`, `messageTtl`, `maxLength`, `singleActiveConsumer` (see below) |
 | `timeout` | publish | none | Milliseconds to wait for the broker to take the message before rejecting with a `ClientError` (`PUBLISH_TIMEOUT`), e.g. while it is unreachable. Without it the call waits for the reconnect |
@@ -306,6 +347,8 @@ await client.publish('<queue>', { foo: 'bar' }, queueOptions);
 | `Consumer` | type | Resolved by `consume()`: `cancel()` and `[Symbol.asyncDispose]()` |
 | `ConsumeOptions` / `PublishOptions` | type | amqplib options plus the extensions listed above |
 | `QueueOptions` | type | Queue arguments (`queueType`, `deliveryLimit`, `deadLetterExchange`, `deadLetterRoutingKey`, `messageTtl`, `maxLength`, `singleActiveConsumer`), part of both `ConsumeOptions` and `PublishOptions` |
+| `ConsumeRetryOptions` | type | `retry` consume option: `maxAttempts`, `delay` |
+| `ATTEMPT_HEADER`, `resolveAttempt`, `resolveRetryDelay`, `retryMessage` | constant / function | The `x-attempt` header name, reading it from message properties, the backoff, and the re-publish step |
 | `ConsumeMessage` | type | Re-export of amqplib's message type |
 | `AmqpExtensionError`, `TopologyError`, `ClientError`, `BrokerError`, `SerializationError` | class | Error tree, see [Errors](#errors) |
 | `ErrorCode` | enum | Stable error codes |
@@ -320,6 +363,7 @@ await client.publish('<queue>', { foo: 'bar' }, queueOptions);
 - **Invalid input rejects before anything touches the broker:** an empty queue name on the default exchange, a named exchange type without a `name`, or an empty routing key when publishing to a named exchange, with a `TopologyError`.
 - **Unconsumed fanout/topic messages are dropped**, unless `consume` passes `queue` and has declared it at least once. Without it, named exchanges bind an exclusive, auto-deleted queue per `consume` call, which lives only as long as that consumer.
 - **Handler errors are not rethrown.** They are passed to the `onError` consume option, if set.
+- **`cancel()` waits for a retry in its backoff** (up to 30s), because the message is settled only after it was re-published.
 
 ## License
 

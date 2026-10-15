@@ -23,6 +23,8 @@ The pure decisions are tested directly, without a broker:
 - `planTopology`: a table of exchange kind × publish/consume × options → `Topology`, plus every validation error.
 - `handleMessage`: handler/`$any` dispatch and the ack/nack/requeue/`noAck` table, using a two-method `{ ack, nack }` fake that records calls (no `vi.fn`). Also: no rejection when `ack` throws on a closed channel, and the `onError` table (handler error, missing handler, `noAck`, `onError` itself throwing).
 
+`handleMessage` with `retry` gets a fake `HandleMessageContext` (a recording `republish`, an in-flight `Map`), so the retry table and the redelivery guard (skip, ordered hold, crashed redelivery, no `messageId`) are broker-free too. `test/unit/retry.spec.ts` covers the `x-attempt` parsing (absent/junk → 1), the backoff and `retryMessage`.
+
 Add new decision logic here, as pure functions, rather than as more broker tests.
 
 `test/unit/errors.spec.ts` is also broker-free. It covers the error factories and the `toError` mapping.
