@@ -6,7 +6,7 @@
  */
 
 import type { ConsumeMessage } from 'amqplib';
-import type { PublishProperties } from '../publish';
+import type { RepublishOptions } from '../publish';
 import type { ConsumeRetryOptions } from './types';
 
 /**
@@ -42,7 +42,7 @@ export function resolveRetryDelay(attempt: number, base: number) : number {
  */
 export async function retryMessage(
     message: ConsumeMessage,
-    publish: (content: Buffer, options: PublishProperties) => Promise<void>,
+    publish: (content: Buffer, options: RepublishOptions) => Promise<void>,
     options: ConsumeRetryOptions,
 ) : Promise<boolean> {
     const attempt = resolveAttempt(message.properties) + 1;
@@ -54,7 +54,7 @@ export async function retryMessage(
         setTimeout(resolve, resolveRetryDelay(attempt, options.delay ?? 1000));
     });
 
-    const properties : PublishProperties = {
+    const properties : RepublishOptions = {
         ...message.properties,
         headers: { ...message.properties.headers, [ATTEMPT_HEADER]: attempt },
     };

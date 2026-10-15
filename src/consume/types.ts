@@ -6,7 +6,7 @@
  */
 
 import type { Channel, ConsumeMessage, Options } from 'amqplib';
-import type { PublishProperties } from '../publish';
+import type { RepublishOptions } from '../publish';
 import type { QueueOptions } from '../queue';
 import type { ConsumeHandlerAnyKey } from './constants';
 
@@ -122,5 +122,5 @@ export type HandleMessageContext = {
     /**
      * Re-publish content to the queue the message came from, resolving once the broker confirmed it.
      */
-    republish: (content: Buffer, options: PublishProperties) => Promise<void>,
+    republish: (content: Buffer, options: RepublishOptions) => Promise<void>,
 };

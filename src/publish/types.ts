@@ -11,7 +11,12 @@ import type { QueueOptions } from '../queue';
 /**
  * The AMQP properties of a published message (type, messageId, headers, persistent, …).
  */
-export type PublishProperties = Options.Publish;
+type PublishProperties = Options.Publish;
+
+/**
+ * The properties a message is re-published with for a retry.
+ */
+export type RepublishOptions = PublishProperties;
 
 export type PublishOptions = PublishProperties & QueueOptions & {
     /**
