@@ -56,7 +56,7 @@ amqp-extension/
 | `src/utils.ts`    | `mergeOptions`: deep merge where the call-site options win                                          |
 | `src/consume/`    | Consume option and handler types, `$any` fallback key, `handleMessage` (dispatch + ack/nack policy) |
 | `src/errors/`     | Error tree on `@ebec/core`, `ErrorCode`, internal `toError()`                                      |
-| `src/publish/`    | Publish option/context types (`amqplib` `Options.Publish` & `QueueOptions`)                          |
+| `src/publish/`    | Publish option/context types (`amqplib` `Options.Publish` & `QueueOptions`, plus `timeout`)           |
 | `src/queue/`      | `QueueOptions` (flat on consume/publish options) plus topology planning/declaration for every exchange kind |
 | `src/exchange/`   | `ExchangeType` enum, `Exchange` shape, default-exchange detection                                  |
 

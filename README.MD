@@ -211,6 +211,7 @@ const client = new Client({
 | `prefetchCount` | consume | — | Maximum number of unacknowledged messages per consumer (`channel.prefetch`) |
 | `noAck` | consume | `false` | amqplib option. When `true`, no `ack`/`nack` is sent at all |
 | `singleActiveConsumer` | both | `false` | Declare the default-exchange queue as single active consumer (see below) |
+| `timeout` | publish | none | Milliseconds to wait for the broker to take the message before rejecting with a `ClientError` (`PUBLISH_TIMEOUT`), e.g. while it is unreachable. Without it the call waits for the reconnect |
 
 ### Queue options
 
