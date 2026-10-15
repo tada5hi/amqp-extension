@@ -18,7 +18,8 @@ amqp-extension/
 │   ├── errors/
 │   │   ├── base.ts           # AmqpExtensionError (extends @ebec/core BaseError)
 │   │   ├── topology.ts, client.ts, broker.ts, serialization.ts  # subclasses with static factories
-│   │   ├── constants.ts      # ErrorCode enum
+│   │   ├── check.ts          # is*Error guards (matchesInstanceof, also match JSON round-trips)
+│   │   ├── constants.ts      # ErrorCode enum, Symbol.for markers per class
 │   │   ├── types.ts          # BrokerReply, AmqpReplyError
 │   │   └── utils.ts          # toError(): foreign error → error tree (internal, not re-exported)
 │   ├── exchange/

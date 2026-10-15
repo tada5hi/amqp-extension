@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import { BaseError } from '@ebec/core';
+import { BaseError, markInstanceof } from '@ebec/core';
 import {
     describe,
     expect,
@@ -18,6 +18,11 @@ import {
     ErrorCode,
     SerializationError,
     TopologyError,
+    isAmqpExtensionError,
+    isBrokerError,
+    isClientError,
+    isSerializationError,
+    isTopologyError,
 } from '../../src';
 import { toError } from '../../src/errors/utils';
 
@@ -112,6 +117,64 @@ describe('src/errors', () => {
                 message: 'x',
                 cause: 'x',
             });
+        });
+    });
+
+    describe('duck typing', () => {
+        const errors = {
+            topology: TopologyError.queueNameEmpty(),
+            client: ClientError.closed(),
+            broker: BrokerError.fromAmqp(Object.assign(new Error('406'), { code: 406 })),
+            serialization: SerializationError.payload(),
+        };
+
+        it('should match each class by instanceof and guard, and nothing else', () => {
+            expect(errors.topology).toBeInstanceOf(TopologyError);
+            expect(errors.topology).not.toBeInstanceOf(ClientError);
+            expect(errors.client).not.toBeInstanceOf(BrokerError);
+            expect(errors.broker).not.toBeInstanceOf(SerializationError);
+            expect(errors.serialization).not.toBeInstanceOf(TopologyError);
+
+            expect(isTopologyError(errors.topology)).toBe(true);
+            expect(isClientError(errors.client)).toBe(true);
+            expect(isBrokerError(errors.broker)).toBe(true);
+            expect(isSerializationError(errors.serialization)).toBe(true);
+            expect(isClientError(errors.topology)).toBe(false);
+
+            for (const error of Object.values(errors)) {
+                expect(error).toBeInstanceOf(AmqpExtensionError);
+                expect(isAmqpExtensionError(error)).toBe(true);
+            }
+        });
+
+        it('should not match foreign errors', () => {
+            expect(new Error('x')).not.toBeInstanceOf(AmqpExtensionError);
+            expect(new BaseError('x')).not.toBeInstanceOf(AmqpExtensionError);
+            expect(isAmqpExtensionError(new BaseError('x'))).toBe(false);
+            expect(isAmqpExtensionError(undefined)).toBe(false);
+            expect(isAmqpExtensionError({ code: 'CLIENT_CLOSED' })).toBe(false);
+        });
+
+        it('should match an error from another copy of the library', () => {
+            // a duplicate copy has other classes but the same Symbol.for markers
+            const foreign = new Error('The client is closed.');
+            markInstanceof(foreign, Symbol.for('amqp-extension/AmqpExtensionError'));
+            markInstanceof(foreign, Symbol.for('amqp-extension/ClientError'));
+
+            expect(foreign).toBeInstanceOf(AmqpExtensionError);
+            expect(foreign).toBeInstanceOf(ClientError);
+            expect(foreign).not.toBeInstanceOf(BrokerError);
+            expect(isClientError(foreign)).toBe(true);
+            expect(toError(foreign)).toBe(foreign);
+        });
+
+        it('should match a JSON round-tripped error by guard', () => {
+            const copy = JSON.parse(JSON.stringify(errors.broker));
+
+            expect(isBrokerError(copy)).toBe(true);
+            expect(isAmqpExtensionError(copy)).toBe(true);
+            expect(isClientError(copy)).toBe(false);
+            expect(copy).toMatchObject({ code: 'BROKER_REJECTED', replyCode: 406 });
         });
     });
 });

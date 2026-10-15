@@ -15,3 +15,10 @@ export enum ErrorCode {
     BROKER_REJECTED = 'BROKER_REJECTED',
     SERIALIZATION_FAILED = 'SERIALIZATION_FAILED',
 }
+
+// Symbol.for markers, shared by every copy of the library (see check.ts)
+export const AMQP_EXTENSION_ERROR_MARKER = Symbol.for('amqp-extension/AmqpExtensionError');
+export const TOPOLOGY_ERROR_MARKER = Symbol.for('amqp-extension/TopologyError');
+export const CLIENT_ERROR_MARKER = Symbol.for('amqp-extension/ClientError');
+export const BROKER_ERROR_MARKER = Symbol.for('amqp-extension/BrokerError');
+export const SERIALIZATION_ERROR_MARKER = Symbol.for('amqp-extension/SerializationError');

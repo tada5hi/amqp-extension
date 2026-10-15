@@ -100,6 +100,7 @@ consume(from, options?, handlers)
 - A payload that cannot be serialized (circular, `BigInt`, or one that `JSON.stringify` turns into `undefined`) rejects `publish` with `SerializationError` (`SERIALIZATION_FAILED`) before any channel is opened.
 - Broker rejections become `BrokerError` (`replyCode`, `classId`, `methodId`; amqplib error as `cause`). Only that channel closes.
 - `publish`/`consume` pass every rejection through `toError()` (`src/errors/utils.ts`), so callers only ever see `AmqpExtensionError` subclasses. It maps amqp-connection-manager's `timeout` / `Channel closed` by message (`ponytail:`, they carry no class or code).
+- Error identity is duck-typed through `@ebec/core`'s marker chain: every error class calls `markInstanceof(this, Symbol.for('amqp-extension/<Class>'))` and overrides `static [Symbol.hasInstance]` with `hasInstanceof` on its own marker, so `instanceof` also matches errors from a duplicate copy of the library. A new subclass **must** do both, otherwise it inherits its parent's `hasInstance` and matches every sibling. The `is*Error` guards (`src/errors/check.ts`) use `matchesInstanceof`, which also accepts the string chain `toJSON()` emits, so they match errors that crossed a JSON boundary.
 
 ## Configuration
 

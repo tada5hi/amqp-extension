@@ -38,7 +38,7 @@ TypeScript is pinned to 6.x because `typescript-eslint` does not support TS 7 ye
 |-----------------|------------------------------------------------|-------------------------------------------------|
 | `*Options`      | Options passed to broker calls, mostly `amqplib` `Options.*` aliases/extensions | `PublishOptions`, `ConsumeOptions`, `ExchangeOptions` |
 | `*Context`      | Object-form input for a method or constructor  | `ClientContext`, `ConsumeContext`, `PublishContext` |
-| `is*`           | Type guards                                    | `isDefaultExchange` |
+| `is*`           | Type guards                                    | `isDefaultExchange`, `isBrokerError` |
 | Enum + template literal | Accept enum values as plain strings    | `type: \`${ExchangeType}\`` |
 
 ## File Organization

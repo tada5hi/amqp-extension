@@ -6,14 +6,19 @@
  */
 
 import type { ErrorInput } from '@ebec/core';
+import { hasInstanceof, markInstanceof } from '@ebec/core';
 import { AmqpExtensionError } from './base';
-import { ErrorCode } from './constants';
+import { BROKER_ERROR_MARKER, ErrorCode } from './constants';
 import type { AmqpReplyError, BrokerReply } from './types';
 
 /**
  * The broker rejected an operation, e.g. 406 PRECONDITION_FAILED or 403 ACCESS_REFUSED.
  */
 export class BrokerError extends AmqpExtensionError {
+    static override [Symbol.hasInstance](input: unknown) : boolean {
+        return hasInstanceof(input, BROKER_ERROR_MARKER);
+    }
+
     readonly replyCode: number;
 
     readonly classId?: number;
@@ -26,6 +31,8 @@ export class BrokerError extends AmqpExtensionError {
         this.replyCode = reply.replyCode;
         this.classId = reply.classId;
         this.methodId = reply.methodId;
+
+        markInstanceof(this, BROKER_ERROR_MARKER);
     }
 
     override toJSON() {

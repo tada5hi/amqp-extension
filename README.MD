@@ -188,6 +188,7 @@ try {
 ```
 
 The original amqplib / amqp-connection-manager error is available as `cause`.
+`instanceof` also matches errors from a duplicate copy of the library (e.g. two versions in `node_modules`). Errors that crossed a process boundary as JSON (`toJSON()`) are recognized by the guards `isAmqpExtensionError`, `isTopologyError`, `isClientError`, `isBrokerError` and `isSerializationError`.
 A failure the library does not recognize surfaces as the base `AmqpExtensionError` with code `AMQP_EXTENSION_ERROR`, and the original error as `cause`.
 
 Earlier releases rejected invalid input with a plain `SyntaxError` or `Error`. Replace `instanceof SyntaxError` checks with `instanceof TopologyError`; the messages are unchanged.
@@ -246,6 +247,7 @@ await client.publish('<queue>', { foo: 'bar' }, { singleActiveConsumer: true });
 | `ConsumeMessage` | type | Re-export of amqplib's message type |
 | `AmqpExtensionError`, `TopologyError`, `ClientError`, `BrokerError`, `SerializationError` | class | Error tree, see [Errors](#errors) |
 | `ErrorCode` | enum | Stable error codes |
+| `isAmqpExtensionError`, `isTopologyError`, `isClientError`, `isBrokerError`, `isSerializationError` | function | Error guards that also match duplicate library copies and JSON round-trips |
 
 ## Notes
 

@@ -7,6 +7,7 @@
 
 export * from './base';
 export * from './broker';
+export * from './check';
 export * from './client';
 export * from './constants';
 export * from './serialization';
