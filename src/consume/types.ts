@@ -5,11 +5,8 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type {
-    Channel,
-    ConsumeMessage,
-    Options,
-} from 'amqplib';
+import type { Channel, ConsumeMessage, Options } from 'amqplib';
+import type { PublishProperties } from '../publish';
 import type { QueueOptions } from '../queue';
 import type { ConsumeHandlerAnyKey } from './constants';
 
@@ -125,5 +122,5 @@ export type HandleMessageContext = {
     /**
      * Re-publish content to the queue the message came from, resolving once the broker confirmed it.
      */
-    republish: (content: Buffer, options: Options.Publish) => Promise<void>,
+    republish: (content: Buffer, options: PublishProperties) => Promise<void>,
 };

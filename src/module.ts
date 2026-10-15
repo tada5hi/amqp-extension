@@ -7,7 +7,7 @@
 
 import type { ChannelWrapper } from 'amqp-connection-manager';
 import { connect } from 'amqp-connection-manager';
-import type { Channel, Options } from 'amqplib';
+import type { Channel } from 'amqplib';
 import type {
     ConsumeContext,
     ConsumeHandlers,
@@ -20,7 +20,7 @@ import { ClientError, SerializationError } from './errors';
 import { toError } from './errors/utils';
 import type { Exchange } from './exchange';
 import { ExchangeType } from './exchange';
-import type { PublishContext, PublishOptions } from './publish';
+import type { PublishContext, PublishOptions, PublishProperties } from './publish';
 import { assertTopology, planTopology } from './queue/utils';
 import type { ClientContext, Connection } from './types';
 import { mergeOptions } from './utils';
@@ -240,7 +240,7 @@ export class Client {
      * ponytail: a server-named queue is gone after a reconnect, so a retry of a
      * message from before it is unroutable and dropped by the broker.
      */
-    protected async republish(queue: string, content: Buffer, options: Options.Publish) : Promise<void> {
+    protected async republish(queue: string, content: Buffer, options: PublishProperties) : Promise<void> {
         this.assertOpen();
 
         const channel = this.connection.createChannel();

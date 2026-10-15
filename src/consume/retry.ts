@@ -5,7 +5,8 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { ConsumeMessage, Options } from 'amqplib';
+import type { ConsumeMessage } from 'amqplib';
+import type { PublishProperties } from '../publish';
 import type { ConsumeRetryOptions } from './types';
 
 /**
@@ -41,7 +42,7 @@ export function resolveRetryDelay(attempt: number, base: number) : number {
  */
 export async function retryMessage(
     message: ConsumeMessage,
-    publish: (content: Buffer, options: Options.Publish) => Promise<void>,
+    publish: (content: Buffer, options: PublishProperties) => Promise<void>,
     options: ConsumeRetryOptions,
 ) : Promise<boolean> {
     const attempt = resolveAttempt(message.properties) + 1;
@@ -53,7 +54,7 @@ export async function retryMessage(
         setTimeout(resolve, resolveRetryDelay(attempt, options.delay ?? 1000));
     });
 
-    const properties : Options.Publish = {
+    const properties : PublishProperties = {
         ...message.properties,
         headers: { ...message.properties.headers, [ATTEMPT_HEADER]: attempt },
     };
