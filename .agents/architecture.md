@@ -23,7 +23,7 @@ For every non-default type (`topic`, `fanout`, `match`), `consume(from, ...)` do
 2. Asserts an anonymous queue `{ durable: false, autoDelete: true, exclusive: true }`.
 3. Binds it with `from` as the routing key / binding pattern.
 
-`publish` on a named exchange asserts only the exchange. A named exchange type without `exchange.name` is rejected (`SyntaxError`) for both publish and consume.
+`publish` on a named exchange asserts only the exchange. A named exchange type without `exchange.name` is rejected (`TopologyError`) for both publish and consume.
 
 ### 3. Topology is planned as data, declared inside `createChannel({ setup })`
 
@@ -33,9 +33,9 @@ Every setup function is wrapped in `guard()` (`src/module.ts`), which attaches a
 
 ### 4. Broker rejections reject the call, transient errors don't
 
-`consume` races `waitForConnect()` against `failure(wrapper)`. `failure()` rejects on a wrapper `'error'` **that carries an AMQP reply code** (a broker rejection: 403/404/405/406…) or on the wrapper's `'close'` (e.g. `client.close()` before setup, which otherwise never settles). Errors without a reply code (the connection dropped mid-setup: `Channel ended…`, `Connection closing`) are transient: amqp-connection-manager re-runs the setup on reconnect, so the call keeps waiting. A failed `consume` closes its channel. The listener stays attached, so setup errors after a later reconnect are swallowed instead of crashing the process (`ponytail:` ceiling: no `onError` hook yet).
+`consume` races `waitForConnect()` against `failure(wrapper)`. `failure()` rejects on a wrapper `'error'` **that carries an AMQP reply code** (a broker rejection: 403/404/405/406…) or on the wrapper's `'close'` (`ClientError.channelClosed()`; e.g. `client.close()` before setup, which otherwise never settles). Errors without a reply code (the connection dropped mid-setup: `Channel ended…`, `Connection closing`) are transient: amqp-connection-manager re-runs the setup on reconnect, so the call keeps waiting. A failed `consume` closes its channel. The listener stays attached, so setup errors after a later reconnect are swallowed instead of crashing the process (`ponytail:` ceiling: no `onError` hook yet).
 
-`client.close()` marks the shared connection as closed (a module-level `WeakSet`), so later `publish()`/`consume()` calls on it or any `of()` sibling reject with `The client is closed.` instead of hanging on a closed connection manager.
+`client.close()` marks the shared connection as closed (a module-level `WeakSet`), so later `publish()`/`consume()` calls on it or any `of()` sibling reject with `ClientError.closed()` (`The client is closed.`) instead of hanging on a closed connection manager.
 
 ### 5. One channel per publish
 
@@ -96,8 +96,11 @@ consume(from, options?, handlers)
 - Ack/nack happens only when `options.noAck` is falsy.
 - When no handler matches, or a handler throws, the message is `nack`ed with `requeue = options.requeueOnFailure ?? false`. Handler errors are swallowed and not rethrown or logged.
 - An `ack`/`nack` that throws because the channel closed while the handler ran (reconnect) is swallowed. The broker redelivers the message.
-- Configuration errors (empty queue name on the default exchange, missing exchange name, missing publish destination) reject `publish`/`consume` with `Error` / `SyntaxError` before any channel is opened.
-- Broker rejections of a declaration (e.g. 406 `PRECONDITION_FAILED`) reject `publish`/`consume`. Only that channel closes, and the connection stays up.
+- Configuration errors reject with `TopologyError` (`QUEUE_NAME_EMPTY`, `EXCHANGE_NAME_MISSING`, `DESTINATION_MISSING`) before any channel is opened.
+- A payload that cannot be serialized (circular, `BigInt`, or one that `JSON.stringify` turns into `undefined`) rejects `publish` with `SerializationError` (`SERIALIZATION_FAILED`) before any channel is opened.
+- Broker rejections become `BrokerError` (`replyCode`, `classId`, `methodId`; amqplib error as `cause`). Only that channel closes.
+- `publish`/`consume` pass every rejection through `toError()` (`src/errors/utils.ts`), so callers only ever see `AmqpExtensionError` subclasses. It maps amqp-connection-manager's `timeout` / `Channel closed` by message (`ponytail:`, they carry no class or code).
+- Error identity is duck-typed through `@ebec/core`'s marker chain: every error class calls `markInstanceof(this, Symbol.for('amqp-extension/<Class>'))` and overrides `static [Symbol.hasInstance]` with `hasInstanceof` on its own marker, so `instanceof` also matches errors from a duplicate copy of the library. A new subclass **must** do both, otherwise it inherits its parent's `hasInstance` and matches every sibling. The `is*Error` guards (`src/errors/check.ts`) use `matchesInstanceof`, which also accepts the string chain `toJSON()` emits, so they match errors that crossed a JSON boundary.
 
 ## Configuration
 

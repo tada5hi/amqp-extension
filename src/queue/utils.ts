@@ -7,6 +7,7 @@
 
 import type { Channel, Options } from 'amqplib';
 import type { Exchange } from '../exchange';
+import { TopologyError } from '../errors';
 import { isDefaultExchange } from '../exchange';
 import type { QueueOptions, Topology } from './types';
 
@@ -23,7 +24,7 @@ export function planTopology(
 ) : Topology {
     if (isDefaultExchange(exchange.type)) {
         if (!key) {
-            throw new Error('The queue name can not be empty if the default exchange is selected.');
+            throw TopologyError.queueNameEmpty();
         }
 
         const queueOptions : Options.AssertQueue = { durable: true };
@@ -35,7 +36,7 @@ export function planTopology(
     }
 
     if (!exchange.name) {
-        throw new SyntaxError('A non default exchange requires a name.');
+        throw TopologyError.exchangeNameMissing();
     }
 
     const topology : Topology = {
@@ -48,7 +49,7 @@ export function planTopology(
 
     if (!consume) {
         if (!key) {
-            throw new SyntaxError('The publish operation requires a destination.');
+            throw TopologyError.destinationMissing();
         }
 
         return topology;

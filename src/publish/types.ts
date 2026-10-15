@@ -8,7 +8,16 @@
 import type { Options } from 'amqplib';
 import type { QueueOptions } from '../queue';
 
-export type PublishOptions = Options.Publish & QueueOptions;
+export type PublishOptions = Options.Publish & QueueOptions & {
+    /**
+     * Reject with ClientError (PUBLISH_TIMEOUT) when the message is not
+     * handed to the broker within this many milliseconds, e.g. while the
+     * broker is unreachable and the connection manager is reconnecting.
+     *
+     * Default: undefined (wait for the reconnect)
+     */
+    timeout?: number
+};
 export type PublishContext = {
     to: string,
     data: any,

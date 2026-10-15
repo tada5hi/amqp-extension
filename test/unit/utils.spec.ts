@@ -11,6 +11,7 @@ import {
     expect,
     it,
 } from 'vitest';
+import { TopologyError } from '../../src';
 import { handleMessage } from '../../src/consume/utils';
 import { planTopology } from '../../src/queue/utils';
 
@@ -68,17 +69,17 @@ describe('src/queue/utils', () => {
     });
 
     it('should reject an empty queue name on the default exchange', () => {
-        expect(() => planTopology({ type: 'direct' }, '', {})).toThrow(/queue name/);
+        expect(() => planTopology({ type: 'direct' }, '', {})).toThrow(TopologyError);
         expect(() => planTopology({ type: 'direct' }, '', {}, true)).toThrow(/queue name/);
     });
 
     it('should reject a named exchange type without a name, for publish and consume', () => {
-        expect(() => planTopology({ type: 'topic' }, 'a', {})).toThrow(SyntaxError);
-        expect(() => planTopology({ type: 'topic', name: '' }, 'a', {}, true)).toThrow(SyntaxError);
+        expect(() => planTopology({ type: 'topic' }, 'a', {})).toThrow(TopologyError);
+        expect(() => planTopology({ type: 'topic', name: '' }, 'a', {}, true)).toThrow(TopologyError);
     });
 
     it('should reject publishing to a named exchange without a routing key', () => {
-        expect(() => planTopology(topic, '', {})).toThrow(SyntaxError);
+        expect(() => planTopology(topic, '', {})).toThrow(TopologyError);
     });
 });
 
