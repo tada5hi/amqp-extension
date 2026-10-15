@@ -80,15 +80,15 @@ publish(to, data, options?)
   1. Merge options with client publishOptions
   2. Serialize: Buffer as-is · string → utf-8 · anything else → JSON.stringify
   3. planTopology (validation, throws before any channel exists)
-  4. createChannel({ setup: assertTopology }) → ready() (rejects on setup failure)
-  5. channel.publish(exchange.name || '', to, buffer, options) → boolean; close channel (finally)
+  4. createChannel({ setup: guard(assertTopology) }); the message is queued right away (sent after setup)
+  5. race(channel.publish(exchange.name || '', to, buffer, options), failure()) → boolean; close channel (finally)
 
 consume(from, options?, handlers)
   1. Merge options with client consumeOptions
   2. planTopology(…, consume = true) (validation, throws before any channel exists)
-  3. Channel setup: assertTopology → prefetch(prefetchCount) → channel.consume(queue, handleMessage, options)
-  4. ready() resolves, or rejects (and closes the channel) on setup failure
-  5. handleMessage: pick handler by properties.type or $any → await → ack; on throw/no handler → nack
+  3. Channel setup (guard): assertTopology → prefetch(prefetchCount) → channel.consume(queue, handleMessage, options)
+  4. race(waitForConnect(), failure()) resolves, or rejects (and closes the channel) on a broker rejection / close
+  5. handleMessage: pick the own handler for properties.type or $any → await → ack; on throw/no handler → nack
 ```
 
 ## Error Handling

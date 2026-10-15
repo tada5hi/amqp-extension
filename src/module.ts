@@ -14,7 +14,7 @@ import type { Exchange } from './exchange';
 import { ExchangeType } from './exchange';
 import type { PublishContext, PublishOptions } from './publish';
 import { assertTopology, planTopology } from './queue/utils';
-import type { ClientContext, Connection } from './type';
+import type { ClientContext, Connection } from './types';
 import { mergeOptions } from './utils';
 
 // connections closed through Client.close(), shared by of() siblings

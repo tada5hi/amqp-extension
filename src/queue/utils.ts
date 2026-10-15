@@ -6,24 +6,10 @@
  */
 
 import type { Channel, Options } from 'amqplib';
-import type { Exchange, ExchangeOptions } from '../exchange';
+import type { Exchange } from '../exchange';
 import { isDefaultExchange } from '../exchange';
-import type { QueueOptions } from './type';
+import type { QueueOptions, Topology } from './types';
 
-/**
- * What must exist on the broker before publishing or consuming.
- */
-export type Topology = {
-    exchange?: {
-        name: string,
-        type: Exchange['type'],
-        options?: ExchangeOptions
-    },
-    // name '' = server-named queue
-    queue?: { name: string, options: Options.AssertQueue },
-    // routing key binding the queue to the exchange
-    bind?: string,
-};
 
 /**
  * Plan the topology for publishing to or consuming from (consume = true) a key.

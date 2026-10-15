@@ -30,7 +30,7 @@ npx tsc --noEmit       # standalone type check (tsconfig has noEmit)
 - **[Project Structure](.agents/structure.md)**: `src/` modules (consume, publish, exchange, queue), public exports, dependencies
 - **[Architecture](.agents/architecture.md)**: `Client` design, overloaded `publish`/`consume` signatures, topology planning (`planTopology`/`assertTopology`), `handleMessage` settlement, setup-failure rejection, option merging
 - **[Testing](.agents/testing.md)**: Vitest setup, the RabbitMQ testcontainer global setup, the `provide`/`inject` connection string handoff
-- **[Conventions](.agents/conventions.md)**: ESLint config, file layout (`type.ts`/`utils.ts`/`constants.ts` + barrel), commitlint, release-please, CI
+- **[Conventions](.agents/conventions.md)**: ESLint config, file layout (`types.ts`/`utils.ts`/`constants.ts` + barrel), commitlint, release-please, CI
 
 ## Branches
 

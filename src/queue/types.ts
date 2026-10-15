@@ -5,6 +5,9 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import type { Options } from 'amqplib';
+import type { Exchange, ExchangeOptions } from '../exchange';
+
 /**
  * Options of the named, durable queue asserted for the default exchange,
  * accepted flat on both ConsumeOptions and PublishOptions.
@@ -19,4 +22,21 @@ export type QueueOptions = {
      * Default: false
      */
     singleActiveConsumer?: boolean,
+};
+
+/**
+ * What must exist on the broker before publishing or consuming.
+ *
+ * @internal
+ */
+export type Topology = {
+    exchange?: {
+        name: string,
+        type: Exchange['type'],
+        options?: ExchangeOptions
+    },
+    // name '' = server-named queue
+    queue?: { name: string, options: Options.AssertQueue },
+    // routing key binding the queue to the exchange
+    bind?: string,
 };

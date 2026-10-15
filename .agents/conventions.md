@@ -45,7 +45,7 @@ TypeScript is pinned to 6.x because `typescript-eslint` does not support TS 7 ye
 
 Each feature directory under `src/` uses the following files:
 
-- `type.ts`: exported types
+- `types.ts`: exported types (public ones and internal ones alike; mark internal types `/** @internal */`, `stripInternal` drops them from the published `.d.ts`)
 - `constants.ts`: enums and constant keys
 - `utils.ts`: guards and helpers
 - `index.ts`: barrel that re-exports the files above

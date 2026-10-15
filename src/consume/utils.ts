@@ -7,7 +7,7 @@
 
 import type { Channel, ConsumeMessage } from 'amqplib';
 import { ConsumeHandlerAnyKey } from './constants';
-import type { ConsumeHandlers, ConsumeOptions } from './type';
+import type { ConsumeHandlers, ConsumeOptions } from './types';
 
 /**
  * Dispatch a delivery to the handler for its type (or $any) and settle it:
