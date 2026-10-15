@@ -60,6 +60,12 @@ describe('src/errors', () => {
             methodId: 10,
         });
         expect(error.cause).toBe(cause);
+        expect(error.toJSON()).toMatchObject({
+            code: 'BROKER_REJECTED',
+            replyCode: 406,
+            classId: 50,
+            methodId: 10,
+        });
     });
 
     describe('toError', () => {

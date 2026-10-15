@@ -120,7 +120,7 @@ describe('src/module', () => {
             replyCode: 406,
         });
         await expect(client.consume('mismatch', { $any: () => {} })).rejects.toThrow(/PRECONDITION_FAILED/);
-        await expect(client.publish('mismatch', 'fooBar')).rejects.toMatchObject({
+        await expect(client.consume('mismatch', { $any: () => {} })).rejects.toMatchObject({
             constructor: BrokerError,
             code: 'BROKER_REJECTED',
             replyCode: 406,

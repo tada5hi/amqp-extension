@@ -28,6 +28,15 @@ export class BrokerError extends AmqpExtensionError {
         this.methodId = reply.methodId;
     }
 
+    override toJSON() {
+        return {
+            ...super.toJSON(),
+            replyCode: this.replyCode,
+            classId: this.classId,
+            methodId: this.methodId,
+        };
+    }
+
     static fromAmqp(err: AmqpReplyError) {
         return new BrokerError(
             {
