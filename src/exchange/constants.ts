@@ -2,5 +2,5 @@ export enum ExchangeType {
     FANOUT = 'fanout',
     DIRECT = 'direct',
     TOPIC = 'topic',
-    MATCH = 'match',
+    HEADERS = 'headers',
 }

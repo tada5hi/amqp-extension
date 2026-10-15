@@ -23,7 +23,7 @@ amqp-extension/
 │   │   ├── types.ts          # BrokerReply, AmqpReplyError
 │   │   └── utils.ts          # toError(): foreign error → error tree (internal, not re-exported)
 │   ├── exchange/
-│   │   ├── constants.ts      # ExchangeType enum (fanout, direct, topic, match)
+│   │   ├── constants.ts      # ExchangeType enum (fanout, direct, topic, headers)
 │   │   ├── types.ts          # Exchange, ExchangeOptions
 │   │   └── utils.ts          # isDefaultExchange()
 │   ├── publish/
