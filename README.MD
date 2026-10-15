@@ -188,6 +188,7 @@ try {
 ```
 
 The original amqplib / amqp-connection-manager error is available as `cause`.
+A failure the library does not recognize surfaces as the base `AmqpExtensionError` with code `AMQP_EXTENSION_ERROR`, and the original error as `cause`.
 
 Earlier releases rejected invalid input with a plain `SyntaxError` or `Error`. Replace `instanceof SyntaxError` checks with `instanceof TopologyError`; the messages are unchanged.
 

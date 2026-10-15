@@ -25,6 +25,8 @@ The pure decisions are tested directly, without a broker:
 
 Add new decision logic here, as pure functions, rather than as more broker tests.
 
+`test/unit/errors.spec.ts` is also broker-free. It covers the error factories and the `toError` mapping.
+
 ### Broker tests (`test/unit/module.spec.ts`)
 
 No mocks or fakes. Tests run the real `Client` against a live broker. They cover delivery end to end (incl. fanout with an empty key), the `{}`-options regression, broker rejections (406 declaration, 403 exclusive consume — the connection must survive both), a connection drop during setup (call completes after reconnect), connection recycling on a runtime channel error, the publish `timeout` during an outage, calls after `close()`, eager validation errors and `close()`. For outage scenarios inject a connection with a short retry delay: `new Client({ connection: connect(url, { reconnectTimeInSeconds: 0.1 }) })`:
