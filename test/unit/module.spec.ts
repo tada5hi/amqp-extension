@@ -20,6 +20,7 @@ import {
     Client,
     ClientError,
     type ConsumeMessage,
+    ExchangeType,
     SerializationError,
     TopologyError,
 } from '../../src';
@@ -309,6 +310,14 @@ describe('src/module', () => {
         await fanout.publish('any', 'fooBar');
 
         await expect(received).resolves.toEqual('fooBar');
+    });
+
+    it('should declare every named exchange type', async () => {
+        const types = Object.values(ExchangeType).filter((type) => type !== ExchangeType.DIRECT);
+
+        for (const type of types) {
+            await expect(client.of({ type, name: `exchange-type-${type}` }).consume('', { $any: () => {} })).resolves.toBeDefined();
+        }
     });
 
     it('should pass the connection manager options', async () => {

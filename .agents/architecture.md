@@ -18,7 +18,7 @@ A thin facade over `amqp-connection-manager`. One `Client` holds the following:
 
 ### 2. Named exchanges use an exclusive, temporary queue per consumer, or a durable named one
 
-For every non-default type (`topic`, `fanout`, `match`), `consume(from, ...)` does the following:
+For every non-default type (`topic`, `fanout`, `headers`), `consume(from, ...)` does the following:
 1. Asserts the exchange (`exchange.name`, `exchange.type`, `exchange.options`).
 2. Asserts an anonymous queue `{ durable: false, autoDelete: true, exclusive: true }`, or, with the consume-only option `queue`, the queue of that name `{ durable: true, arguments }` with the `QueueOptions` arguments (the anonymous queue never gets them).
 3. Binds it with `from` as the routing key / binding pattern. Bindings are never removed, so another `from` on the same `queue` adds one.
