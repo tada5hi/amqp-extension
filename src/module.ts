@@ -159,6 +159,8 @@ export class Client {
             // the latest setup run, awaited by cancel(): one in progress during a reconnect still registers a consumer
             let running : Promise<void> | undefined;
             const inFlight = new Set<Promise<void>>();
+            // with retry: the same runs by messageId, for the redelivery guard; kept across setup runs (reconnects)
+            const tracked = new Map<string, Promise<void>>();
 
             const channel = this.connection.createChannel({
                 setup: guard((ch: Channel) => {
@@ -173,7 +175,10 @@ export class Client {
                             await ch.prefetch(options.prefetchCount);
                         }
 
-                        const context : HandleMessageContext = { republish: (content, props) => this.republish(queue, content, props) };
+                        const context : HandleMessageContext = {
+                            inFlight: tracked,
+                            republish: (content, props) => this.republish(queue, content, props),
+                        };
 
                         const { consumerTag } = await ch.consume(queue, (message) => {
                             const handled = handleMessage(message, ch, ctx.handlers, options, context);

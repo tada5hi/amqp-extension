@@ -402,6 +402,102 @@ describe('src/consume/utils', () => {
             expect(channel.calls).toEqual(['nack:false']);
         });
 
+        describe('redelivery guard', () => {
+            const redeliver = (message: ConsumeMessage, messageId: unknown = message.properties.messageId) => ({
+                ...message,
+                fields: { ...message.fields, redelivered: true },
+                properties: { ...message.properties, messageId },
+            }) as ConsumeMessage;
+
+            it('should skip a redelivered copy of a message still being handled, then retry a later one', async () => {
+                const channel = createChannel();
+                const { published, context } = createContext(channel.calls);
+                const message = createRetryMessage();
+                let runs = 0;
+                const { promise: gate, resolve } = Promise.withResolvers<void>();
+
+                const running = handleMessage(message, channel, { created: () => { runs++; return gate; } }, { retry }, context);
+                // the channel was reset: the copy is acked right away, the original keeps running
+                await handleMessage(redeliver(message), channel, { created: () => { runs++; } }, { retry }, context);
+                expect(channel.calls).toEqual(['ack']);
+
+                resolve();
+                await running;
+                expect(runs).toBe(1);
+
+                // once settled, a redelivery means the consumer died mid-handling
+                await handleMessage(redeliver(message), channel, { created: () => { runs++; } }, { retry }, context);
+                expect(runs).toBe(1);
+                expect(published[0]!.headers).toEqual({ [ATTEMPT_HEADER]: 2 });
+            });
+
+            it('should hold a redelivered copy of an ordered message until the original settles', async () => {
+                const channel = createChannel();
+                const { context } = createContext(channel.calls);
+                const message = createRetryMessage();
+                const { promise: gate, resolve } = Promise.withResolvers<void>();
+
+                const running = handleMessage(message, channel, { created: () => gate }, { retry, ordered: true }, context);
+                const copy = handleMessage(redeliver(message), channel, { created: () => {} }, { retry, ordered: true }, context);
+
+                await new Promise((r) => { setTimeout(r, 10); });
+                expect(channel.calls).toEqual([]);
+
+                resolve();
+                await Promise.all([running, copy]);
+                expect(channel.calls).toEqual(['ack', 'ack']);
+            });
+
+            it('should count a redelivery that is not in flight as a failed attempt', async () => {
+                const channel = createChannel();
+                const { published, context } = createContext(channel.calls);
+                let runs = 0;
+
+                await handleMessage(redeliver(createRetryMessage(3)), channel, { created: () => { runs++; } }, { retry }, context);
+
+                expect(runs).toBe(0);
+                expect(channel.calls).toEqual(['republish', 'ack']);
+                expect(published[0]!.headers).toEqual({ [ATTEMPT_HEADER]: 4 });
+            });
+
+            it('should drop a crashed redelivery once its attempts are exhausted', async () => {
+                const channel = createChannel();
+                const { context } = createContext(channel.calls);
+                const errors: unknown[] = [];
+
+                await handleMessage(redeliver(createRetryMessage(5)), channel, { created: () => {} }, {
+                    retry,
+                    onError: (e) => { errors.push(e); },
+                }, context);
+
+                expect(channel.calls).toEqual(['ack']);
+                expect(errors[0]).toMatchObject({ code: ErrorCode.ATTEMPTS_EXHAUSTED });
+            });
+
+            it('should not retry a redelivery twice when the channel resets during its backoff', async () => {
+                const channel = createChannel();
+                const { published, context } = createContext(channel.calls);
+                const message = redeliver(createRetryMessage());
+
+                const retrying = handleMessage(message, channel, {}, { retry: { delay: 20 } }, context);
+                await handleMessage(message, channel, {}, { retry: { delay: 20 } }, context);
+                await retrying;
+
+                expect(published).toHaveLength(1);
+            });
+
+            it('should not guard a message without messageId', async () => {
+                const channel = createChannel();
+                const { context } = createContext(channel.calls);
+                let runs = 0;
+
+                await handleMessage(redeliver(createRetryMessage(), null), channel, { created: () => { runs++; } }, { retry }, context);
+
+                expect(runs).toBe(1);
+                expect(channel.calls).toEqual(['ack']);
+            });
+        });
+
         it('should not retry with noAck', async () => {
             const channel = createChannel();
             const { context } = createContext(channel.calls);

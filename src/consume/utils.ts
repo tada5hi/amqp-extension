@@ -34,9 +34,25 @@ async function report(options: ConsumeOptions, error: unknown, message: ConsumeM
 }
 
 /**
+ * Track a run by message id until it settles, so redelivered copies can find it.
+ */
+async function track(inFlight: Map<string, Promise<void>>, id: string, run: Promise<void>) : Promise<void> {
+    inFlight.set(id, run);
+
+    try {
+        await run;
+    } finally {
+        if (inFlight.get(id) === run) {
+            inFlight.delete(id);
+        }
+    }
+}
+
+/**
  * Dispatch a delivery to the handler for its type (or $any) and settle it:
  * ack on success, nack (requeue = requeueOnFailure) on failure or without handler, nothing with noAck.
- * With retry, a handler failure is re-published with the next attempt and the original acked instead.
+ * With retry, a handler failure is re-published with the next attempt and the original acked instead,
+ * and redeliveries of messages with a messageId are guarded (see ConsumeOptions.retry).
  * A failure is then reported to onError.
  */
 export async function handleMessage(
@@ -51,6 +67,43 @@ export async function handleMessage(
         return;
     }
 
+    const id = message.properties.messageId;
+    if (!options.retry || options.noAck || !context || typeof id !== 'string') {
+        await dispatch(message, channel, handlers, options, context);
+        return;
+    }
+
+    if (message.fields.redelivered) {
+        const running = context.inFlight.get(id);
+        if (running) {
+            // the channel was reset while this consumer still handles the original: drop the copy.
+            // Acking it would free the prefetch slot and let the next message of an ordered
+            // stream run next to the original, so with ordered it waits (runs never reject).
+            if (options.ordered) {
+                await running;
+            }
+
+            settle(() => channel.ack(message));
+            return;
+        }
+
+        // the consumer died mid-handling (crash, consumer timeout): a failed attempt.
+        // Tracked through the backoff, so a reset during it does not retry it twice.
+        // ponytail: in-process only; a redelivery landing on another consumer runs again.
+        await track(context.inFlight, id, fail(message, channel, options, context));
+        return;
+    }
+
+    await track(context.inFlight, id, dispatch(message, channel, handlers, options, context));
+}
+
+async function dispatch(
+    message: ConsumeMessage,
+    channel: Settlement,
+    handlers: ConsumeHandlers,
+    options: ConsumeOptions,
+    context?: HandleMessageContext,
+) : Promise<void> {
     // the type is set by the publisher (untrusted): never resolve inherited properties like 'toString'
     const { type } = message.properties;
     const handler = (typeof type === 'string' && Object.hasOwn(handlers, type) ? handlers[type] : undefined) ||
@@ -67,8 +120,8 @@ export async function handleMessage(
 
     try {
         await handler(message, channel as Channel);
-    } catch (e) {
-        await fail(message, channel, options, context, e);
+    } catch (error) {
+        await fail(message, channel, options, context, { error });
         return;
     }
 
@@ -78,23 +131,24 @@ export async function handleMessage(
 }
 
 /**
- * Settle a message whose handler threw: retry it (with retry), else nack it.
+ * Settle a failed message: retry it (with retry), else nack it.
+ * failure is undefined for a redelivery of a message whose consumer died: there is no error to report.
  */
 async function fail(
     message: ConsumeMessage,
     channel: Settlement,
     options: ConsumeOptions,
-    context: HandleMessageContext | undefined,
-    error: unknown,
+    context?: HandleMessageContext,
+    failure?: { error: unknown },
 ) : Promise<void> {
     if (options.noAck) {
-        await report(options, error, message);
+        if (failure) await report(options, failure.error, message);
         return;
     }
 
     if (!options.retry || !context) {
         settle(() => channel.nack(message, false, options.requeueOnFailure ?? false));
-        await report(options, error, message);
+        if (failure) await report(options, failure.error, message);
         return;
     }
 
@@ -104,11 +158,16 @@ async function fail(
     } catch {
         // the re-publish failed (e.g. broker unavailable): requeue, so it comes back as a redelivery
         settle(() => channel.nack(message, false, true));
-        await report(options, error, message);
+        if (failure) await report(options, failure.error, message);
         return;
     }
 
     // ponytail: a crash between the re-publish and this ack duplicates the message (at-least-once)
     settle(() => channel.ack(message));
-    await report(options, retried ? error : ClientError.attemptsExhausted(message.properties.type, error), message);
+
+    if (!retried) {
+        await report(options, ClientError.attemptsExhausted(message.properties.type, failure?.error), message);
+    } else if (failure) {
+        await report(options, failure.error, message);
+    }
 }

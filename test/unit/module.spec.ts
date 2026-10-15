@@ -519,6 +519,47 @@ describe('src/module', () => {
         await consumer.cancel();
     });
 
+    it('should hold a redelivered copy of an ordered message still being handled after a reconnect', { timeout: 20_000 }, async () => {
+        const other = new Client({ connection: connect(inject('MQ_CONNECTION_STRING'), { reconnectTimeInSeconds: 0.1 }) });
+        const queueOptions = { singleActiveConsumer: true };
+        const seen: string[] = [];
+        const { promise: started, resolve: start } = Promise.withResolvers<void>();
+        const { promise: gate, resolve: open } = Promise.withResolvers<void>();
+
+        const consumer = await other.consume('redelivery-ordered', {
+            ...queueOptions,
+            prefetchCount: 1,
+            ordered: true,
+            retry: { delay: 10 },
+        }, {
+            $any: async (message) => {
+                seen.push(message.content.toString());
+                start();
+                await gate;
+            },
+        });
+        await other.publish('redelivery-ordered', 'm1', { ...queueOptions, messageId: 'm1' });
+        await started;
+
+        // the channel is reset while m1 is handled: the broker redelivers m1 to the re-registered consumer
+        const reconnected = new Promise((resolve) => { other.connection.once('connect', resolve); });
+        other.connection.reconnect();
+        await reconnected;
+        await other.publish('redelivery-ordered', 'm2', { ...queueOptions, messageId: 'm2' });
+
+        // the copy of m1 holds the prefetch slot, so m2 waits behind it
+        await expect.poll(() => inspect(other, 'redelivery-ordered')).toMatchObject({ messageCount: 1, consumerCount: 1 });
+        await sleep(200);
+        expect(seen).toEqual(['m1']);
+
+        open();
+        await expect.poll(() => seen).toEqual(['m1', 'm2']);
+        await consumer.cancel();
+        // the copy was acked, not left to be requeued
+        await expect(inspect(other, 'redelivery-ordered')).resolves.toMatchObject({ messageCount: 0 });
+        await other.close();
+    });
+
     it('should close the connection', async () => {
         const other = new Client({ connectionOptions: inject('MQ_CONNECTION_STRING') });
         await other.publish('close', 'fooBar');
