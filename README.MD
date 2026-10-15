@@ -155,7 +155,15 @@ await client.consume('user.*', {
 });
 ```
 
-A handler that resolves acknowledges the message. A handler that throws, or a message with no matching handler, gets a `nack`.
+A handler that resolves acknowledges the message. A handler that throws, or a message with no matching handler, gets a `nack`. Pass `onError` to see these failures: it is called after the `nack` with the handler's error, or with a `ClientError` (`HANDLER_MISSING`) when no handler matched. Its own errors are swallowed.
+
+```typescript
+await client.consume('user.*', {
+    onError: (error, message) => logger.error(error, { type: message.properties.type }),
+}, {
+    userCreated: async (message) => { /* ... */ },
+});
+```
 
 `consume()` resolves a `Consumer` once the subscription is in place. `cancel()` stops new deliveries, waits for the handlers still running (their messages are acked or nacked as usual), then closes the consumer's channel. It never rejects, and the consumer is not re-registered after a reconnect. `await using` cancels it when the scope ends:
 
@@ -190,7 +198,7 @@ await notifications.publish('deploy', { message: 'deploy finished' });
 | Class | `code` |
 |---|---|
 | `TopologyError` | `QUEUE_NAME_EMPTY`, `EXCHANGE_NAME_MISSING`, `DESTINATION_MISSING` |
-| `ClientError` | `CLIENT_CLOSED`, `CHANNEL_CLOSED`, `PUBLISH_TIMEOUT` |
+| `ClientError` | `CLIENT_CLOSED`, `CHANNEL_CLOSED`, `PUBLISH_TIMEOUT`, `HANDLER_MISSING` (passed to `onError` only) |
 | `BrokerError` | `BROKER_REJECTED`, with the AMQP reply code as `replyCode` |
 | `SerializationError` | `SERIALIZATION_FAILED` |
 
@@ -233,6 +241,7 @@ const client = new Client({
 | `requeueOnFailure` | consume | `false` | Requeue messages that are `nack`ed because a handler threw or none matched |
 | `prefetchCount` | consume | none | Maximum number of unacknowledged messages per consumer (`channel.prefetch`) |
 | `noAck` | consume | `false` | amqplib option. When `true`, no `ack`/`nack` is sent at all |
+| `onError` | consume | none | `(error, message) => void \| Promise<void>`, called when a handler threw or none matched (also with `noAck`). A call-site `onError` replaces the client default |
 | `singleActiveConsumer` | both | `false` | Declare the default-exchange queue as single active consumer (see below) |
 | `timeout` | publish | none | Milliseconds to wait for the broker to take the message before rejecting with a `ClientError` (`PUBLISH_TIMEOUT`), e.g. while it is unreachable. Without it the call waits for the reconnect |
 
@@ -279,7 +288,7 @@ await client.publish('<queue>', { foo: 'bar' }, { singleActiveConsumer: true });
 - **A consumer cancelled by the broker stays cancelled**, e.g. when its queue is deleted. Call `consume()` again after re-creating the queue.
 - **Invalid input rejects before anything touches the broker:** an empty queue name on the default exchange, a named exchange type without a `name`, or an empty routing key when publishing to a named exchange, with a `TopologyError`.
 - **Unconsumed fanout/topic messages are dropped.** Named exchanges bind an exclusive, auto-deleted queue per `consume` call, which lives only as long as that consumer.
-- **Handler errors are not rethrown.** Catch and log inside the handler if you need visibility.
+- **Handler errors are not rethrown.** They are passed to the `onError` consume option, if set.
 
 ## License
 

@@ -33,7 +33,7 @@ Every setup function is wrapped in `guard()` (`src/module.ts`), which attaches a
 
 ### 4. Broker rejections reject the call, transient errors don't
 
-`consume` races `waitForConnect()` against `failure(wrapper)`. `failure()` rejects on a wrapper `'error'` **that carries an AMQP reply code** (a broker rejection: 403/404/405/406…) or on the wrapper's `'close'` (`ClientError.channelClosed()`; e.g. `client.close()` before setup, which otherwise never settles). Errors without a reply code (the connection dropped mid-setup: `Channel ended…`, `Connection closing`) are transient: amqp-connection-manager re-runs the setup on reconnect, so the call keeps waiting. A failed `consume` closes its channel. The listener stays attached, so setup errors after a later reconnect are swallowed instead of crashing the process (`ponytail:` ceiling: no `onError` hook yet).
+`consume` races `waitForConnect()` against `failure(wrapper)`. `failure()` rejects on a wrapper `'error'` **that carries an AMQP reply code** (a broker rejection: 403/404/405/406…) or on the wrapper's `'close'` (`ClientError.channelClosed()`; e.g. `client.close()` before setup, which otherwise never settles). Errors without a reply code (the connection dropped mid-setup: `Channel ended…`, `Connection closing`) are transient: amqp-connection-manager re-runs the setup on reconnect, so the call keeps waiting. A failed `consume` closes its channel. The listener stays attached, so setup errors after a later reconnect are swallowed instead of crashing the process (`ponytail:` ceiling: no hook for setup errors; `onError` covers handler failures only).
 
 `consume` then resolves a `Consumer` (`src/consume/types.ts`). Its setup records the raw channel and consumer tag of every run, tracks the in-flight `handleMessage` promises and returns early once cancelled. `cancel()` is memoized and never rejects: it sets `cancelled` (no setup run after it, so a reconnect does not re-register the consumer), awaits a setup run still in progress (a reconnect that already passed the check registers a consumer), sends `basic.cancel` to the latest run's channel (errors swallowed, e.g. on a closed channel), awaits the in-flight handlers until none is left (so their messages are settled on the still-open channel) and closes the wrapper. `Symbol.asyncDispose` is `cancel`. `ponytail:` ceilings: a handler that never settles hangs `cancel()`, and so does a connection that drops between ChannelClose and CloseOk (amqplib).
 
@@ -69,11 +69,11 @@ Call-site options are merged on top of client defaults:
 options = ctx.options ? mergeOptions(ctx.options, this.consumeOptions) : this.consumeOptions; // left (call-site) wins
 ```
 
-`mergeOptions` (smob) deep-merges, clones without mutating its inputs and dedupes arrays. It only runs when call options are passed: its clone turns a `Buffer` (e.g. in `headers`) into a plain `Uint8Array`, which amqplib no longer encodes as bytes.
+`mergeOptions` (smob) deep-merges, clones without mutating its inputs and dedupes arrays. It only runs when call options are passed: its clone turns a `Buffer` (e.g. in `headers`) into a plain `Uint8Array`, which amqplib no longer encodes as bytes. It clones through `structuredClone`, which throws on functions, so `consume` takes `onError` out of both sides first and re-attaches it afterwards (call-site value, else the client default).
 
 ### Handler dispatch and settlement
 
-`handleMessage(message, channel, handlers, options)` (`src/consume/utils.ts`, internal) owns the whole policy: `ConsumeHandlers` maps `message.properties.type` to a handler, `'$any'` (`ConsumeHandlerAnyKey`) is the fallback, and the delivery is acked or nacked. It needs only `{ ack, nack }` from the channel, so it is tested broker-free. It never rejects: amqplib discards the consumer callback's promise, so a rejection would be unhandled.
+`handleMessage(message, channel, handlers, options)` (`src/consume/utils.ts`, internal) owns the whole policy: `ConsumeHandlers` maps `message.properties.type` to a handler, `'$any'` (`ConsumeHandlerAnyKey`) is the fallback, the delivery is acked or nacked, and a failure is then reported to `options.onError`. It needs only `{ ack, nack }` from the channel, so it is tested broker-free. It never rejects: amqplib discards the consumer callback's promise, so a rejection would be unhandled.
 
 ## Data Flow
 
@@ -96,7 +96,7 @@ consume(from, options?, handlers)
 ## Error Handling
 
 - Ack/nack happens only when `options.noAck` is falsy.
-- When no handler matches, or a handler throws, the message is `nack`ed with `requeue = options.requeueOnFailure ?? false`. Handler errors are swallowed and not rethrown or logged.
+- When no handler matches, or a handler throws, the message is `nack`ed with `requeue = options.requeueOnFailure ?? false`. Then `options.onError` (if set, also with `noAck`) is called with the handler's error or `ClientError.handlerMissing(type)` (`HANDLER_MISSING`). Its own throw or rejection is swallowed. Handler errors are never rethrown.
 - An `ack`/`nack` that throws because the channel closed while the handler ran (reconnect) is swallowed. The broker redelivers the message.
 - Configuration errors reject with `TopologyError` (`QUEUE_NAME_EMPTY`, `EXCHANGE_NAME_MISSING`, `DESTINATION_MISSING`) before any channel is opened.
 - A payload that cannot be serialized (circular, `BigInt`, or one that `JSON.stringify` turns into `undefined`) rejects `publish` with `SerializationError` (`SERIALIZATION_FAILED`) before any channel is opened.

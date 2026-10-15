@@ -377,6 +377,27 @@ describe('src/module', () => {
         await expect(inspect(client, 'cancel-dispose')).resolves.toMatchObject({ consumerCount: 0 });
     });
 
+    it('should report handler failures to onError, the call-site one first', { timeout: 10_000 }, async () => {
+        const fallback: unknown[] = [];
+        const other = new Client({
+            connectionOptions: inject('MQ_CONNECTION_STRING'),
+            consumeOptions: { onError: (error) => { fallback.push(error); } },
+        });
+        const { promise: reported, resolve } = Promise.withResolvers<unknown>();
+
+        await other.consume('on-error', { onError: (error) => { resolve(error); }, prefetchCount: 1 }, { $any: () => { throw new Error('boom'); } });
+        // call-site options without onError: the client default reports
+        await other.consume('on-error-default', { prefetchCount: 1 }, { created: () => {} });
+
+        await other.publish('on-error', 'fooBar');
+        await other.publish('on-error-default', 'fooBar', { type: 'unknown' });
+
+        await expect(reported).resolves.toMatchObject({ message: 'boom' });
+        await expect.poll(() => fallback).toHaveLength(1);
+        expect(fallback[0]).toMatchObject({ constructor: ClientError, code: 'HANDLER_MISSING' });
+        await other.close();
+    });
+
     it('should close the connection', async () => {
         const other = new Client({ connectionOptions: inject('MQ_CONNECTION_STRING') });
         await other.publish('close', 'fooBar');

@@ -21,7 +21,7 @@ npx vitest --config test/vitest.config.ts --run test/unit/utils.spec.ts   # sing
 
 The pure decisions are tested directly, without a broker:
 - `planTopology`: a table of exchange kind × publish/consume × options → `Topology`, plus every validation error.
-- `handleMessage`: handler/`$any` dispatch and the ack/nack/requeue/`noAck` table, using a two-method `{ ack, nack }` fake that records calls (no `vi.fn`). Also: no rejection when `ack` throws on a closed channel.
+- `handleMessage`: handler/`$any` dispatch and the ack/nack/requeue/`noAck` table, using a two-method `{ ack, nack }` fake that records calls (no `vi.fn`). Also: no rejection when `ack` throws on a closed channel, and the `onError` table (handler error, missing handler, `noAck`, `onError` itself throwing).
 
 Add new decision logic here, as pure functions, rather than as more broker tests.
 
@@ -29,7 +29,7 @@ Add new decision logic here, as pure functions, rather than as more broker tests
 
 ### Broker tests (`test/unit/module.spec.ts`)
 
-No mocks or fakes. Tests run the real `Client` against a live broker. They cover delivery end to end (incl. fanout with an empty key), the `{}`-options regression, broker rejections (406 declaration, 403 exclusive consume; the connection must survive both), a connection drop during setup (call completes after reconnect), connection recycling on a runtime channel error, the publish `timeout` during an outage, calls after `close()`, eager validation errors and `close()`. For outage scenarios inject a connection with a short retry delay: `new Client({ connection: connect(url, { reconnectTimeInSeconds: 0.1 }) })`:
+No mocks or fakes. Tests run the real `Client` against a live broker. They cover delivery end to end (incl. fanout with an empty key), the `{}`-options regression, broker rejections (406 declaration, 403 exclusive consume; the connection must survive both), a connection drop during setup (call completes after reconnect), connection recycling on a runtime channel error, the shared publish channel (concurrent publishes, a 406 next to a valid publish, publishing after a forced reconnect, a rejected replayed declaration), the publish `timeout` during an outage, consumer `cancel()` (in-flight handler, reconnect, twice, after `close()`, `await using`), `onError` option merging, calls after `close()`, eager validation errors and `close()`. For outage scenarios inject a connection with a short retry delay: `new Client({ connection: connect(url, { reconnectTimeInSeconds: 0.1 }) })`:
 
 - `globalSetup` (`test/utils/global-setup.ts`) starts the container with user `root` / password `start123` and exposed port 5672. It hands the AMQP URL to the tests with `project.provide('MQ_CONNECTION_STRING', ...)` and returns a teardown function that stops the container. The `ProvidedContext` augmentation for this key also lives in that file.
 - Specs read the URL with `inject('MQ_CONNECTION_STRING')` from `vitest`, create a `Client` in `beforeAll`, and close `client.connection` in `afterAll`.

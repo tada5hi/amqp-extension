@@ -11,7 +11,11 @@ import {
     expect,
     it,
 } from 'vitest';
-import { TopologyError } from '../../src';
+import {
+    ErrorCode,
+    TopologyError,
+    isClientError,
+} from '../../src';
 import { handleMessage } from '../../src/consume/utils';
 import { planTopology } from '../../src/queue/utils';
 
@@ -174,6 +178,79 @@ describe('src/consume/utils', () => {
         await handleMessage(null, channel, {}, {});
 
         expect(channel.calls).toEqual([]);
+    });
+
+    describe('onError', () => {
+        const createOnError = (calls: string[]) => {
+            const errors: unknown[] = [];
+            const messages: unknown[] = [];
+            const onError = (error: unknown, message: ConsumeMessage) => {
+                calls.push('onError');
+                errors.push(error);
+                messages.push(message);
+            };
+
+            return {
+                errors, 
+                messages, 
+                onError, 
+            };
+        };
+
+        it('should report a handler error after the nack', async () => {
+            const channel = createChannel();
+            const {
+                errors, 
+                messages, 
+                onError, 
+            } = createOnError(channel.calls);
+            const error = new Error('boom');
+            const message = createMessage('created');
+
+            await handleMessage(message, channel, { created: () => { throw error; } }, { onError });
+
+            expect(channel.calls).toEqual(['nack:false', 'onError']);
+            expect(errors).toEqual([error]);
+            expect(messages[0]).toBe(message);
+        });
+
+        it('should report a missing handler', async () => {
+            const channel = createChannel();
+            const { errors, onError } = createOnError(channel.calls);
+
+            await handleMessage(createMessage('unknown'), channel, {}, { onError });
+
+            expect(channel.calls).toEqual(['nack:false', 'onError']);
+            expect(isClientError(errors[0])).toBe(true);
+            expect(errors[0]).toMatchObject({ code: ErrorCode.HANDLER_MISSING });
+        });
+
+        it('should not report a handled message', async () => {
+            const channel = createChannel();
+            const { onError } = createOnError(channel.calls);
+
+            await handleMessage(createMessage('created'), channel, { created: () => {} }, { onError });
+
+            expect(channel.calls).toEqual(['ack']);
+        });
+
+        it('should report with noAck', async () => {
+            const channel = createChannel();
+            const { onError } = createOnError(channel.calls);
+
+            await handleMessage(createMessage('created'), channel, { created: () => { throw new Error('boom'); } }, { noAck: true, onError });
+            await handleMessage(createMessage('unknown'), channel, {}, { noAck: true, onError });
+
+            expect(channel.calls).toEqual(['onError', 'onError']);
+        });
+
+        it('should not reject when onError throws or rejects', async () => {
+            const channel = createChannel();
+            const fail = () => { throw new Error('boom'); };
+
+            await expect(handleMessage(createMessage('unknown'), channel, {}, { onError: () => { throw new Error('onError'); } })).resolves.toBeUndefined();
+            await expect(handleMessage(createMessage('created'), channel, { created: fail }, { onError: () => Promise.reject(new Error('onError')) })).resolves.toBeUndefined();
+        });
     });
 
     it('should not reject when acking on a closed channel', async () => {

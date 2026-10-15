@@ -142,7 +142,14 @@ export class Client {
         try {
             this.assertOpen();
 
-            const options = ctx.options ? mergeOptions(ctx.options, this.consumeOptions) : this.consumeOptions;
+            let options = this.consumeOptions;
+            if (ctx.options) {
+                // smob clones through structuredClone, which throws on functions
+                const { onError, ...rest } = ctx.options;
+                const { onError: fallback, ...defaults } = this.consumeOptions;
+                options = { ...mergeOptions(rest, defaults), onError: onError ?? fallback };
+            }
+
             const topology = planTopology(this.exchange, ctx.from, options, true);
 
             let cancelled = false;

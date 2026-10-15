@@ -30,7 +30,14 @@ export type ConsumeOptions = Options.Consume & QueueOptions & {
     /**
      * Default: undefined
      */
-    prefetchCount?: number
+    prefetchCount?: number,
+
+    /**
+     * Called after a message was nacked (or not settled, with noAck) because its handler threw
+     * (with that error) or no handler matched (with a ClientError, code HANDLER_MISSING).
+     * Its own errors are swallowed.
+     */
+    onError?: (error: unknown, message: ConsumeMessage) => Promise<void> | void,
 };
 
 /**
