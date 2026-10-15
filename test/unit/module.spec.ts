@@ -13,6 +13,7 @@ import {
     inject,
     it,
 } from 'vitest';
+import { EventEmitter } from 'node:events';
 import { connect } from 'amqp-connection-manager';
 import {
     BrokerError,
@@ -319,4 +320,35 @@ describe('src/module', () => {
 
         expect(other.connection.isConnected()).toBe(false);
     });
+});
+
+// amqplib never settles a channel close whose connection drops before the broker's close-ok,
+// which cannot be timed against a real broker: a fake channel whose close() never settles stands in
+describe('src/module: channel close that never settles', () => {
+    function createClient() {
+        const channel = Object.assign(new EventEmitter(), {
+            publish: () => Promise.resolve(true),
+            waitForConnect: () => new Promise(() => {}),
+            close: () => new Promise(() => {}),
+        });
+
+        return {
+            channel,
+            client: new Client({ connection: { createChannel: () => channel } as any }),
+        };
+    }
+
+    it('should not hang publish', async () => {
+        const { client } = createClient();
+
+        await expect(client.publish('q', 'x')).resolves.toBe(true);
+    }, 2000);
+
+    it('should not hang a rejected consume', async () => {
+        const { channel, client } = createClient();
+
+        setImmediate(() => channel.emit('error', Object.assign(new Error('PRECONDITION_FAILED'), { code: 406 })));
+
+        await expect(client.consume('q', { $any: async () => {} })).rejects.toThrow(BrokerError);
+    }, 2000);
 });
