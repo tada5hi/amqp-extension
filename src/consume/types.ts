@@ -72,15 +72,6 @@ export type ConsumeOptions = Options.Consume & QueueOptions & {
     retry?: ConsumeRetryOptions,
 
     /**
-     * With retry: hold a redelivered copy of a message still being handled until the
-     * original settles, instead of acking it right away. Acking it would free the
-     * prefetch slot and let the next message of an ordered stream run next to the original.
-     *
-     * Default: false
-     */
-    ordered?: boolean,
-
-    /**
      * Called after a message was nacked, retried (or not settled, with noAck) because its handler threw
      * (with that error) or no handler matched (with a ClientError, code HANDLER_MISSING), and after
      * a message was dropped because its retry attempts were exhausted (with a ClientError, code
@@ -116,8 +107,9 @@ export type ConsumeContext = {
 export type HandleMessageContext = {
     /**
      * Runs of messages still being handled by this consumer, by messageId.
+     * A run resolves true when it handed its message back to the broker (nack with requeue).
      */
-    inFlight: Map<string, Promise<void>>,
+    inFlight: Map<string, Promise<boolean>>,
 
     /**
      * Re-publish content to the queue the message came from, resolving once the broker confirmed it.

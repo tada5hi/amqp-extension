@@ -160,7 +160,7 @@ export class Client {
             let running : Promise<void> | undefined;
             const inFlight = new Set<Promise<void>>();
             // with retry: the same runs by messageId, for the redelivery guard; kept across setup runs (reconnects)
-            const tracked = new Map<string, Promise<void>>();
+            const tracked = new Map<string, Promise<boolean>>();
 
             const channel = this.connection.createChannel({
                 setup: guard((ch: Channel) => {

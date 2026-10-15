@@ -200,7 +200,6 @@ When a handler throws, the message is re-published to the queue it came from (th
 |---|---|---|
 | `retry.maxAttempts` | `5` | Delivery attempts before the message is dropped: it is acked and `onError` receives a `ClientError` (`ATTEMPTS_EXHAUSTED`) with the last handler error as `cause` |
 | `retry.delay` | `1000` | Base of the exponential backoff in ms |
-| `ordered` | `false` | See the redelivery guard below |
 
 - **Delivery is at-least-once.** A crash between the re-publish and the ack delivers the message twice; make handlers idempotent.
 - **There is no dead-letter queue.** An exhausted message is dropped, so log it in `onError` if it must be replayed.
@@ -214,7 +213,7 @@ When a handler throws, the message is re-published to the queue it came from (th
 
 With `retry`, messages carrying a `messageId` are also guarded against redeliveries:
 
-- A redelivered copy of a message this consumer is **still handling** (its channel was reset, e.g. on a reconnect, while the handler ran) is not run again. It is acked right away, or, with `ordered: true`, only once the original has settled. Acking it early frees the prefetch slot, so on a `singleActiveConsumer` queue the next message would run next to the original.
+- A redelivered copy of a message this consumer is **still handling** (its channel was reset, e.g. on a reconnect, while the handler ran) is not run again. It is held until the original has settled, then acked, or requeued in the original's place when the original could not be retried (its re-publish failed: its own `nack` went to the reset channel). Holding it keeps the prefetch slot, so on a `singleActiveConsumer` queue the next message does not run next to the original.
 - A redelivered message this consumer is **not** handling counts as a failed attempt and is retried without running the handler first. Usually a consumer died while handling it (a crash, the broker's `consumer_timeout`), but it can also be a message whose handler succeeded and whose ack was lost to a channel reset: that message runs again (at-least-once).
 
 The guard is per `consume()` call: a redelivery that lands on another consumer or process runs again. Messages without a `messageId` are not guarded.
@@ -296,7 +295,6 @@ const client = new Client({
 | `prefetchCount` | consume | none | Maximum number of unacknowledged messages per consumer (`channel.prefetch`) |
 | `noAck` | consume | `false` | amqplib option. When `true`, no `ack`/`nack` is sent at all |
 | `retry` | consume | none | `{ maxAttempts?, delay? }`: retry messages whose handler threw (see [Retry & redelivery](#retry--redelivery)) |
-| `ordered` | consume | `false` | With `retry`: hold a redelivered copy of a message still being handled until the original settles |
 | `onError` | consume | none | `(error, message) => void \| Promise<void>`, called when a handler threw or none matched (also with `noAck`). A call-site `onError` replaces the client default |
 | Queue options | both | none | `queueType`, `deliveryLimit`, `deadLetterExchange`, `deadLetterRoutingKey`, `messageTtl`, `maxLength`, `singleActiveConsumer` (see below) |
 | `timeout` | publish | none | Milliseconds to wait for the broker to take the message before rejecting with a `ClientError` (`PUBLISH_TIMEOUT`), e.g. while it is unreachable. Without it the call waits for the reconnect |

@@ -519,7 +519,7 @@ describe('src/module', () => {
         await consumer.cancel();
     });
 
-    it('should hold a redelivered copy of an ordered message still being handled after a reconnect', { timeout: 20_000 }, async () => {
+    it('should hold a redelivered copy of a message still being handled after a reconnect', { timeout: 20_000 }, async () => {
         const other = new Client({ connection: connect(inject('MQ_CONNECTION_STRING'), { reconnectTimeInSeconds: 0.1 }) });
         const queueOptions = { singleActiveConsumer: true };
         const seen: string[] = [];
@@ -529,7 +529,6 @@ describe('src/module', () => {
         const consumer = await other.consume('redelivery-ordered', {
             ...queueOptions,
             prefetchCount: 1,
-            ordered: true,
             retry: { delay: 10 },
         }, {
             $any: async (message) => {
