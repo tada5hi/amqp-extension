@@ -44,7 +44,7 @@ function planQueueOptions(options: QueueOptions) : Options.AssertQueue {
 export function planTopology(
     exchange: Exchange,
     key: string,
-    options: QueueOptions,
+    options: QueueOptions & { queue?: string },
     consume?: boolean,
 ) : Topology {
     if (isDefaultExchange(exchange.type)) {
@@ -75,14 +75,20 @@ export function planTopology(
         return topology;
     }
 
-    topology.queue = {
-        name: '',
-        options: {
-            durable: false,
-            autoDelete: true,
-            exclusive: true,
-        },
-    };
+    if (options.queue === '') {
+        throw TopologyError.queueNameEmpty();
+    }
+
+    topology.queue = options.queue ?
+        { name: options.queue, options: planQueueOptions(options) } :
+        {
+            name: '',
+            options: {
+                durable: false,
+                autoDelete: true,
+                exclusive: true,
+            },
+        };
     topology.bind = key;
 
     return topology;

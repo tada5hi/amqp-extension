@@ -14,14 +14,16 @@ A thin facade over `amqp-connection-manager`. One `Client` holds the following:
 
 ### 1. `direct` type means the default exchange
 
-`isDefaultExchange(type)` is true for `undefined` or `'direct'`. In that mode, `to`/`from` is a **queue name**: the queue is asserted durably (always `durable: true`) and messages are published to exchange `''` with the queue name as routing key. An empty queue name throws. Queue options (`QueueOptions`: `queueType`, `deliveryLimit`, `deadLetterExchange`, `deadLetterRoutingKey`, `messageTtl`, `maxLength`, `singleActiveConsumer`) are intersected flat into both `PublishOptions` and `ConsumeOptions`. `planTopology` maps them to `x-*` queue arguments through one key→argument map (`QueueArguments` in `src/queue/utils.ts`); `undefined` and `false` add no argument, and no options means no `arguments` key at all. Nothing is validated client-side: the broker answers a bad combination with a 406 (`BrokerError`). Publisher and consumer must pass the same values, because the broker rejects re-declaring a queue with different arguments. Named exchanges ignore them.
+`isDefaultExchange(type)` is true for `undefined` or `'direct'`. In that mode, `to`/`from` is a **queue name**: the queue is asserted durably (always `durable: true`) and messages are published to exchange `''` with the queue name as routing key. An empty queue name throws. Queue options (`QueueOptions`: `queueType`, `deliveryLimit`, `deadLetterExchange`, `deadLetterRoutingKey`, `messageTtl`, `maxLength`, `singleActiveConsumer`) are intersected flat into both `PublishOptions` and `ConsumeOptions`. `planTopology` maps them to `x-*` queue arguments through one key→argument map (`QueueArguments` in `src/queue/utils.ts`); `undefined` and `false` add no argument, and no options means no `arguments` key at all. Nothing is validated client-side: the broker answers a bad combination with a 406 (`BrokerError`). Publisher and consumer must pass the same values, because the broker rejects re-declaring a queue with different arguments. Named exchanges ignore them, except for the named `queue` of a consume (see section 2).
 
-### 2. Named exchanges use an exclusive, temporary queue per consumer
+### 2. Named exchanges use an exclusive, temporary queue per consumer, or a durable named one
 
 For every non-default type (`topic`, `fanout`, `match`), `consume(from, ...)` does the following:
 1. Asserts the exchange (`exchange.name`, `exchange.type`, `exchange.options`).
-2. Asserts an anonymous queue `{ durable: false, autoDelete: true, exclusive: true }`.
-3. Binds it with `from` as the routing key / binding pattern.
+2. Asserts an anonymous queue `{ durable: false, autoDelete: true, exclusive: true }`, or, with the consume-only option `queue`, the queue of that name `{ durable: true, arguments }` with the `QueueOptions` arguments (the anonymous queue never gets them).
+3. Binds it with `from` as the routing key / binding pattern. Bindings are never removed, so another `from` on the same `queue` adds one.
+
+Once a consume has declared it, a named `queue` keeps messages while no consumer runs, and its consumers split the messages (`publish` declares only the exchange, so earlier messages are unroutable). An empty `queue` throws `TopologyError` (`QUEUE_NAME_EMPTY`). On the default exchange `queue` is ignored (`from` is the queue name).
 
 `publish` on a named exchange asserts only the exchange. A named exchange type without `exchange.name` is rejected (`TopologyError`) for both publish and consume.
 
@@ -85,7 +87,7 @@ publish(to, data, options?)
 
 consume(from, options?, handlers)
   1. Merge options with client consumeOptions
-  2. planTopology(…, consume = true) (validation, throws before any channel exists)
+  2. planTopology(…, consume = true) (validation, throws before any channel exists; anonymous or named queue)
   3. Channel setup (guard): assertTopology → prefetch(prefetchCount) → channel.consume(queue, handleMessage, options)
   4. race(waitForConnect(), failure()) resolves, or rejects (and closes the channel) on a broker rejection / close
   5. handleMessage: pick the own handler for properties.type or $any → await → ack; on throw/no handler → nack
@@ -112,4 +114,4 @@ consume(from, options?, handlers)
 | `connectionOptions` | `amqplib` `Options.Connect` or URL string, used when no `connection` is given |
 | `exchange`          | `{ type, name?, options? }`. Defaults to the default exchange   |
 | `publishOptions`    | Defaults merged into every `publish`                           |
-| `consumeOptions`    | Defaults merged into every `consume`. Extra fields: `requeueOnFailure`, `prefetchCount` and the `QueueOptions` |
+| `consumeOptions`    | Defaults merged into every `consume`. Extra fields: `requeueOnFailure`, `prefetchCount`, `queue` and the `QueueOptions` |

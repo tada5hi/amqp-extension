@@ -30,7 +30,17 @@ export type ConsumeOptions = Options.Consume & QueueOptions & {
     /**
      * Default: undefined
      */
-    prefetchCount?: number
+    prefetchCount?: number,
+
+    /**
+     * Named exchanges only: consume through this durable, named queue instead of
+     * an exclusive, temporary one. Once declared by a consume, it keeps messages while
+     * no consumer runs, and consumers sharing it split the messages. An empty name
+     * throws. Ignored on the default exchange.
+     *
+     * Default: undefined
+     */
+    queue?: string
 };
 
 export type ConsumeContext = {

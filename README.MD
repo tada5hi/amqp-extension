@@ -41,7 +41,7 @@
 | Concern | Plain amqplib | amqp-extension |
 |---|---|---|
 | **Reconnects** | A dropped connection stays dropped. You rebuild the connection, channels and topology yourself | Built on [amqp-connection-manager](https://www.npmjs.com/package/amqp-connection-manager): reconnects automatically and **replays exchange/queue setup** on every reconnect |
-| **Topology** | `assertExchange`, `assertQueue` and `bindQueue` before every publish/consume | Asserted for you. Named exchanges get an exclusive, auto-deleted queue bound to your routing key. The default exchange gets a durable queue |
+| **Topology** | `assertExchange`, `assertQueue` and `bindQueue` before every publish/consume | Asserted for you. Named exchanges get an exclusive, auto-deleted queue bound to your routing key, or a durable named one. The default exchange gets a durable queue |
 | **Payloads** | `Buffer` in, `Buffer` out | Objects are sent as JSON, strings as UTF-8, and `Buffer`s pass through unchanged |
 | **Dispatch** | One callback receives every message | A handler per message `type`, plus an `$any` fallback |
 | **Acknowledgement** | Call `ack`/`nack` manually on every path, including errors | `ack` after the handler resolves, `nack` when it throws or nothing matches, with an optional requeue |
@@ -162,6 +162,20 @@ const notifications = client.of({ name: 'notifications', type: 'fanout' });
 await notifications.publish('deploy', { message: 'deploy finished' });
 ```
 
+By default, `consume` on a named exchange binds an exclusive, temporary queue that lives only as long as the consumer. Pass `queue` to bind a durable, named queue instead: once a `consume` has declared it, it keeps the messages published while no consumer runs, and consumers sharing it split the messages between them. `publish` declares only the exchange, so messages published before the first `consume` are dropped. Queue options apply to it too.
+
+```typescript
+const events = client.of({ name: 'events', type: 'topic' });
+
+await events.consume('user.*', { queue: 'audit', queueType: 'quorum' }, {
+    $any: async (message) => { /* ... */ },
+});
+```
+
+The binding stays on the broker: consuming the same `queue` with another `from` adds a binding, it does not replace the old one. On the default exchange, `queue` is ignored, because `from` already is the queue name.
+
+Pass `queue` per call rather than in the client's `consumeOptions`: a default applies to every `consume` of the client and its `of()` siblings, binding one queue to all of them. Consumers sharing a `queue` should register the same handlers, because a message reaches only one of them, and one without a matching handler nacks it (and drops it, unless `requeueOnFailure`).
+
 ### Errors
 
 `publish()` and `consume()` reject only with subclasses of `AmqpExtensionError` (built on [`@ebec/core`](https://www.npmjs.com/package/@ebec/core)). Check the category with `instanceof` and the specific failure with `code`:
@@ -210,6 +224,7 @@ const client = new Client({
 | Option | Applies to | Default | Purpose |
 |---|---|---|---|
 | `requeueOnFailure` | consume | `false` | Requeue messages that are `nack`ed because a handler threw or none matched |
+| `queue` | consume | none | Named exchanges only: consume through this durable, named queue instead of a temporary one (see [Multiple exchanges](#multiple-exchanges)) |
 | `prefetchCount` | consume | none | Maximum number of unacknowledged messages per consumer (`channel.prefetch`) |
 | `noAck` | consume | `false` | amqplib option. When `true`, no `ack`/`nack` is sent at all |
 | Queue options | both | none | `queueType`, `deliveryLimit`, `deadLetterExchange`, `deadLetterRoutingKey`, `messageTtl`, `maxLength`, `singleActiveConsumer` (see below) |
@@ -217,7 +232,7 @@ const client = new Client({
 
 ### Queue options
 
-On the default exchange, `consume` and `publish` assert a named, durable queue. Queue options are set flat on the publish/consume options and map to queue arguments. Named exchanges ignore them.
+On the default exchange, `consume` and `publish` assert a named, durable queue. Queue options are set flat on the publish/consume options and map to queue arguments. They also apply to the named queue of a `consume` with `queue` on a named exchange; otherwise named exchanges ignore them.
 
 | Option | Queue argument | Purpose |
 |---|---|---|
@@ -272,7 +287,7 @@ await client.publish('<queue>', { foo: 'bar' }, queueOptions);
 - **Calls after `close()` reject** with a `ClientError` (`CLIENT_CLOSED`), also on `of()` siblings.
 - **A consumer cancelled by the broker stays cancelled**, e.g. when its queue is deleted. Call `consume()` again after re-creating the queue.
 - **Invalid input rejects before anything touches the broker:** an empty queue name on the default exchange, a named exchange type without a `name`, or an empty routing key when publishing to a named exchange, with a `TopologyError`.
-- **Unconsumed fanout/topic messages are dropped.** Named exchanges bind an exclusive, auto-deleted queue per `consume` call, which lives only as long as that consumer.
+- **Unconsumed fanout/topic messages are dropped**, unless `consume` passes `queue` and has declared it at least once. Without it, named exchanges bind an exclusive, auto-deleted queue per `consume` call, which lives only as long as that consumer.
 - **Handler errors are not rethrown.** Catch and log inside the handler if you need visibility.
 
 ## License

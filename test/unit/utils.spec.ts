@@ -85,6 +85,44 @@ describe('src/queue/utils', () => {
             });
     });
 
+    it('should plan a durable named queue with queue arguments for consuming with queue', () => {
+        expect(planTopology(topic, 'user.*', { queue: 'audit', queueType: 'quorum' }, true))
+            .toEqual({
+                exchange: {
+                    name: 'events',
+                    type: 'topic',
+                    options: undefined,
+                },
+                queue: {
+                    name: 'audit',
+                    options: { durable: true, arguments: { 'x-queue-type': 'quorum' } },
+                },
+                bind: 'user.*',
+            });
+    });
+
+    it('should not add queue arguments to the exclusive server-named queue', () => {
+        expect(planTopology(topic, 'user.*', { queueType: 'quorum', messageTtl: 10 }, true).queue)
+            .toEqual({
+                name: '',
+                options: {
+                    durable: false,
+                    autoDelete: true,
+                    exclusive: true,
+                },
+            });
+    });
+
+    it('should ignore queue on the default exchange and when publishing', () => {
+        expect(planTopology({ type: 'direct' }, 'jobs', { queue: 'other' }, true))
+            .toEqual({ queue: { name: 'jobs', options: { durable: true } } });
+        expect(planTopology(topic, 'user.created', { queue: 'audit' }).queue).toBeUndefined();
+    });
+
+    it('should reject an empty named queue on a named exchange', () => {
+        expect(() => planTopology(topic, 'user.*', { queue: '' }, true)).toThrow(TopologyError);
+    });
+
     it('should allow consuming a named exchange with an empty binding key', () => {
         expect(planTopology({ type: 'fanout', name: 'broadcast' }, '', {}, true).bind).toEqual('');
     });
