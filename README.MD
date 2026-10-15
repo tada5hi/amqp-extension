@@ -117,6 +117,14 @@ const client = new Client({
 ```
 
 You can pass an existing [amqp-connection-manager](https://www.npmjs.com/package/amqp-connection-manager) connection as `connection` instead of `connectionOptions`.
+`connectionManagerOptions` is passed to amqp-connection-manager's `connect()`, e.g. to change the delay between reconnect attempts (default: 5 s):
+
+```typescript
+const client = new Client({
+    connectionOptions: 'amqp://<user>:<password>@<host>',
+    connectionManagerOptions: { reconnectTimeInSeconds: 1 },
+});
+```
 
 ### Publish
 
@@ -147,7 +155,28 @@ await client.consume('user.*', {
 });
 ```
 
-A handler that resolves acknowledges the message. A handler that throws, or a message with no matching handler, gets a `nack`.
+A handler that resolves acknowledges the message. A handler that throws, or a message with no matching handler, gets a `nack`. Pass `onError` to see these failures: it is called after the `nack` with the handler's error, or with a `ClientError` (`HANDLER_MISSING`) when no handler matched. Its own errors are swallowed.
+
+```typescript
+await client.consume('user.*', {
+    onError: (error, message) => logger.error(error, { type: message.properties.type }),
+}, {
+    userCreated: async (message) => { /* ... */ },
+});
+```
+
+`consume()` resolves a `Consumer` once the subscription is in place. `cancel()` stops new deliveries, waits for the handlers still running (their messages are acked or nacked as usual), then closes the consumer's channel. It never rejects, and the consumer is not re-registered after a reconnect. `await using` cancels it when the scope ends:
+
+```typescript
+const consumer = await client.consume('user.*', { $any: async (message) => { /* ... */ } });
+// ...
+await consumer.cancel();
+
+{
+    await using scoped = await client.consume('jobs', { $any: async (message) => { /* ... */ } });
+    // ...
+} // cancelled here
+```
 
 Both methods also accept a single context object: `client.publish({ to, data, options })`, `client.consume({ from, options, handlers })`.
 
@@ -183,7 +212,7 @@ Pass `queue` per call rather than in the client's `consumeOptions`: a default ap
 | Class | `code` |
 |---|---|
 | `TopologyError` | `QUEUE_NAME_EMPTY`, `EXCHANGE_NAME_MISSING`, `DESTINATION_MISSING` |
-| `ClientError` | `CLIENT_CLOSED`, `CHANNEL_CLOSED`, `PUBLISH_TIMEOUT` |
+| `ClientError` | `CLIENT_CLOSED`, `CHANNEL_CLOSED`, `PUBLISH_TIMEOUT`, `HANDLER_MISSING` (passed to `onError` only) |
 | `BrokerError` | `BROKER_REJECTED`, with the AMQP reply code as `replyCode` |
 | `SerializationError` | `SERIALIZATION_FAILED` |
 
@@ -227,6 +256,7 @@ const client = new Client({
 | `queue` | consume | none | Named exchanges only: consume through this durable, named queue instead of a temporary one (see [Multiple exchanges](#multiple-exchanges)) |
 | `prefetchCount` | consume | none | Maximum number of unacknowledged messages per consumer (`channel.prefetch`) |
 | `noAck` | consume | `false` | amqplib option. When `true`, no `ack`/`nack` is sent at all |
+| `onError` | consume | none | `(error, message) => void \| Promise<void>`, called when a handler threw or none matched (also with `noAck`). A call-site `onError` replaces the client default |
 | Queue options | both | none | `queueType`, `deliveryLimit`, `deadLetterExchange`, `deadLetterRoutingKey`, `messageTtl`, `maxLength`, `singleActiveConsumer` (see below) |
 | `timeout` | publish | none | Milliseconds to wait for the broker to take the message before rejecting with a `ClientError` (`PUBLISH_TIMEOUT`), e.g. while it is unreachable. Without it the call waits for the reconnect |
 
@@ -270,9 +300,10 @@ await client.publish('<queue>', { foo: 'bar' }, queueOptions);
 | Export | Kind | Purpose |
 |---|---|---|
 | `Client` | class | `publish()`, `consume()`, `of()`, `close()`, `[Symbol.asyncDispose]()`, plus the underlying `connection` |
-| `ClientContext` | type | Constructor input: `connection` / `connectionOptions`, `exchange`, `publishOptions`, `consumeOptions` |
+| `ClientContext` | type | Constructor input: `connection` / `connectionOptions`, `connectionManagerOptions`, `exchange`, `publishOptions`, `consumeOptions` |
 | `ExchangeType` | enum | `direct` (default exchange), `topic`, `fanout`, `match` |
 | `ConsumeHandlers` | type | Map from message `type` to handler, with the `$any` fallback key |
+| `Consumer` | type | Resolved by `consume()`: `cancel()` and `[Symbol.asyncDispose]()` |
 | `ConsumeOptions` / `PublishOptions` | type | amqplib options plus the extensions listed above |
 | `QueueOptions` | type | Queue arguments (`queueType`, `deliveryLimit`, `deadLetterExchange`, `deadLetterRoutingKey`, `messageTtl`, `maxLength`, `singleActiveConsumer`), part of both `ConsumeOptions` and `PublishOptions` |
 | `ConsumeMessage` | type | Re-export of amqplib's message type |
@@ -288,7 +319,7 @@ await client.publish('<queue>', { foo: 'bar' }, queueOptions);
 - **A consumer cancelled by the broker stays cancelled**, e.g. when its queue is deleted. Call `consume()` again after re-creating the queue.
 - **Invalid input rejects before anything touches the broker:** an empty queue name on the default exchange, a named exchange type without a `name`, or an empty routing key when publishing to a named exchange, with a `TopologyError`.
 - **Unconsumed fanout/topic messages are dropped**, unless `consume` passes `queue` and has declared it at least once. Without it, named exchanges bind an exclusive, auto-deleted queue per `consume` call, which lives only as long as that consumer.
-- **Handler errors are not rethrown.** Catch and log inside the handler if you need visibility.
+- **Handler errors are not rethrown.** They are passed to the `onError` consume option, if set.
 
 ## License
 

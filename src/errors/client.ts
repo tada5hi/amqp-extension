@@ -31,6 +31,13 @@ export class ClientError extends AmqpExtensionError {
         });
     }
 
+    static handlerMissing(type?: string) {
+        return new ClientError({
+            code: ErrorCode.HANDLER_MISSING,
+            message: typeof type === 'string' ? `No handler for the message type "${type}".` : 'No handler for a message without type.',
+        });
+    }
+
     static timeout(cause?: unknown) {
         return new ClientError({
             code: ErrorCode.PUBLISH_TIMEOUT,

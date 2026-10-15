@@ -46,6 +46,8 @@ describe('src/errors', () => {
         expect(ClientError.closed()).toMatchObject({ code: 'CLIENT_CLOSED', message: 'The client is closed.' });
         expect(ClientError.channelClosed()).toMatchObject({ code: 'CHANNEL_CLOSED', message: 'Channel closed' });
         expect(ClientError.timeout()).toMatchObject({ code: 'PUBLISH_TIMEOUT', message: 'The publish operation timed out.' });
+        expect(ClientError.handlerMissing('created')).toMatchObject({ code: 'HANDLER_MISSING', message: 'No handler for the message type "created".' });
+        expect(ClientError.handlerMissing()).toMatchObject({ code: 'HANDLER_MISSING', message: 'No handler for a message without type.' });
         expect(SerializationError.payload()).toMatchObject({ code: 'SERIALIZATION_FAILED', message: 'The message payload could not be serialized.' });
     });
 

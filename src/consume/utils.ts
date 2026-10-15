@@ -6,12 +6,14 @@
  */
 
 import type { Channel, ConsumeMessage } from 'amqplib';
+import { ClientError } from '../errors';
 import { ConsumeHandlerAnyKey } from './constants';
 import type { ConsumeHandlers, ConsumeOptions } from './types';
 
 /**
  * Dispatch a delivery to the handler for its type (or $any) and settle it:
  * ack on success, nack (requeue = requeueOnFailure) on failure or without handler, nothing with noAck.
+ * A failure is then reported to onError.
  */
 export async function handleMessage(
     message: ConsumeMessage | null,
@@ -30,26 +32,35 @@ export async function handleMessage(
         handlers[ConsumeHandlerAnyKey];
 
     let ok = !!handler;
+    let error : unknown;
     if (handler) {
         try {
             await handler(message, channel as Channel);
-        } catch {
-            // ponytail: handler errors are swallowed (nack only), add an onError option when visibility is needed
+        } catch (e) {
             ok = false;
+            error = e;
+        }
+    } else {
+        error = ClientError.handlerMissing(type);
+    }
+
+    if (!options.noAck) {
+        try {
+            if (ok) {
+                channel.ack(message);
+            } else {
+                channel.nack(message, false, options.requeueOnFailure ?? false);
+            }
+        } catch {
+            // the channel closed while the handler ran (e.g. reconnect): the broker redelivers the message anyway
         }
     }
 
-    if (options.noAck) {
-        return;
-    }
-
-    try {
-        if (ok) {
-            channel.ack(message);
-        } else {
-            channel.nack(message, false, options.requeueOnFailure ?? false);
+    if (!ok && options.onError) {
+        try {
+            await options.onError(error, message);
+        } catch {
+            // never reject: amqplib discards the consumer callback's promise
         }
-    } catch {
-        // the channel closed while the handler ran (e.g. reconnect): the broker redelivers the message anyway
     }
 }
