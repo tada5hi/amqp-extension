@@ -33,6 +33,27 @@ describe('src/queue/utils', () => {
             });
     });
 
+    it.each([
+        [{ queueType: 'quorum' }, { 'x-queue-type': 'quorum' }],
+        [{ deliveryLimit: 3 }, { 'x-delivery-limit': 3 }],
+        [{ deadLetterExchange: 'dlx' }, { 'x-dead-letter-exchange': 'dlx' }],
+        [{ deadLetterRoutingKey: 'dead' }, { 'x-dead-letter-routing-key': 'dead' }],
+        [{ messageTtl: 0 }, { 'x-message-ttl': 0 }],
+        [{ maxLength: 10 }, { 'x-max-length': 10 }],
+        [{ singleActiveConsumer: true, queueType: 'quorum' }, { 'x-single-active-consumer': true, 'x-queue-type': 'quorum' }],
+    ] as const)('should map %o to queue arguments', (options, args) => {
+        expect(planTopology({ type: 'direct' }, 'jobs', options).queue)
+            .toEqual({ name: 'jobs', options: { durable: true, arguments: args } });
+    });
+
+    it('should add no queue arguments for unset or disabled options', () => {
+        expect(planTopology({ type: 'direct' }, 'jobs', {
+            queueType: undefined,
+            messageTtl: undefined,
+            singleActiveConsumer: false,
+        }).queue).toEqual({ name: 'jobs', options: { durable: true } });
+    });
+
     it('should plan only the exchange for publishing to a named exchange', () => {
         expect(planTopology(topic, 'user.created', {}))
             .toEqual({
@@ -62,6 +83,44 @@ describe('src/queue/utils', () => {
                 },
                 bind: 'user.*',
             });
+    });
+
+    it('should plan a durable named queue with queue arguments for consuming with queue', () => {
+        expect(planTopology(topic, 'user.*', { queue: 'audit', queueType: 'quorum' }, true))
+            .toEqual({
+                exchange: {
+                    name: 'events',
+                    type: 'topic',
+                    options: undefined,
+                },
+                queue: {
+                    name: 'audit',
+                    options: { durable: true, arguments: { 'x-queue-type': 'quorum' } },
+                },
+                bind: 'user.*',
+            });
+    });
+
+    it('should not add queue arguments to the exclusive server-named queue', () => {
+        expect(planTopology(topic, 'user.*', { queueType: 'quorum', messageTtl: 10 }, true).queue)
+            .toEqual({
+                name: '',
+                options: {
+                    durable: false,
+                    autoDelete: true,
+                    exclusive: true,
+                },
+            });
+    });
+
+    it('should ignore queue on the default exchange and when publishing', () => {
+        expect(planTopology({ type: 'direct' }, 'jobs', { queue: 'other' }, true))
+            .toEqual({ queue: { name: 'jobs', options: { durable: true } } });
+        expect(planTopology(topic, 'user.created', { queue: 'audit' }).queue).toBeUndefined();
+    });
+
+    it('should reject an empty named queue on a named exchange', () => {
+        expect(() => planTopology(topic, 'user.*', { queue: '' }, true)).toThrow(TopologyError);
     });
 
     it('should allow consuming a named exchange with an empty binding key', () => {

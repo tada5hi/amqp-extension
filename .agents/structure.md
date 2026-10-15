@@ -29,8 +29,8 @@ amqp-extension/
 │   ├── publish/
 │   │   └── types.ts          # PublishOptions, PublishContext
 │   └── queue/
-│       ├── types.ts          # QueueOptions (singleActiveConsumer), Topology (@internal)
-│       └── utils.ts          # planTopology() (pure), assertTopology() (internal)
+│       ├── types.ts          # QueueOptions (x-* queue arguments), Topology (@internal)
+│       └── utils.ts          # QueueArguments map, planTopology() (pure), assertTopology() (internal)
 ├── test/
 │   ├── vitest.config.ts      # include glob, globalSetup, timeouts, coverage thresholds
 │   ├── utils/global-setup.ts # Starts rabbitmq:3-management container, provides MQ_CONNECTION_STRING

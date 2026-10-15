@@ -13,11 +13,13 @@ import {
     inject,
     it,
 } from 'vitest';
+import { EventEmitter } from 'node:events';
 import { connect } from 'amqp-connection-manager';
 import {
     BrokerError,
     Client,
     ClientError,
+    type ConsumeMessage,
     SerializationError,
     TopologyError,
 } from '../../src';
@@ -99,6 +101,72 @@ describe('src/module', () => {
         const passive = received.a.length > 0 ? received.b : received.a;
         expect(active).toEqual(sent);
         expect(passive).toEqual([]);
+    });
+
+    it('should round-trip through a quorum queue', async () => {
+        const { promise: received, resolve } = Promise.withResolvers<string>();
+
+        await client.consume('quorum', { queueType: 'quorum' }, { $any: (message) => { resolve(message.content.toString()); } });
+        await client.publish('quorum', 'fooBar', { queueType: 'quorum' });
+
+        await expect(received).resolves.toEqual('fooBar');
+    });
+
+    it('should reject re-declaring a queue with another queue type', { timeout: 10_000 }, async () => {
+        await client.publish('queue-type', 'fooBar', { queueType: 'quorum' });
+
+        await expect(client.publish('queue-type', 'fooBar', { queueType: 'classic' })).rejects.toMatchObject({
+            constructor: BrokerError,
+            replyCode: 406,
+        });
+        await expect(client.consume('queue-type', { $any: () => {} })).rejects.toMatchObject({
+            constructor: BrokerError,
+            replyCode: 406,
+        });
+
+        expect(client.connection.isConnected()).toBe(true);
+    });
+
+    it('should keep messages for a durable named queue on a topic exchange while no consumer runs', async () => {
+        const exchange = { type: 'topic', name: 'durable-topic' } as const;
+        const url = inject('MQ_CONNECTION_STRING');
+
+        const first = new Client({ connectionOptions: url, exchange });
+        await first.consume('order.*', { queue: 'orders' }, { $any: () => {} });
+        await first.close();
+
+        await client.of(exchange).publish('order.created', 'fooBar');
+
+        const { promise: received, resolve } = Promise.withResolvers<string>();
+        await using second = new Client({ connectionOptions: url, exchange });
+        await second.consume('order.*', { queue: 'orders' }, { $any: (message) => { resolve(message.content.toString()); } });
+
+        await expect(received).resolves.toEqual('fooBar');
+    });
+
+    it('should split the messages of a named topic queue between its consumers', async () => {
+        const exchange = client.of({ type: 'topic', name: 'shared-topic' });
+        const received: Record<string, string[]> = { a: [], b: [] };
+        const { promise: done, resolve } = Promise.withResolvers<void>();
+        const count = (key: string) => (message: ConsumeMessage) => {
+            received[key]!.push(message.content.toString());
+            if (received.a!.length + received.b!.length === 10) {
+                resolve();
+            }
+        };
+
+        await exchange.consume('job.*', { queue: 'jobs-shared', prefetchCount: 1 }, { $any: count('a') });
+        await exchange.consume('job.*', { queue: 'jobs-shared', prefetchCount: 1 }, { $any: count('b') });
+
+        for (let i = 0; i < 10; i++) {
+            await exchange.publish('job.run', `${i}`);
+        }
+
+        await done;
+        // one shared queue: every message reaches exactly one consumer
+        expect([...received.a!, ...received.b!].sort()).toEqual(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']);
+        expect(received.a!.length).toBeGreaterThan(0);
+        expect(received.b!.length).toBeGreaterThan(0);
     });
 
     it('should use the handlers when empty options are passed', async () => {
@@ -252,4 +320,35 @@ describe('src/module', () => {
 
         expect(other.connection.isConnected()).toBe(false);
     });
+});
+
+// amqplib never settles a channel close whose connection drops before the broker's close-ok,
+// which cannot be timed against a real broker: a fake channel whose close() never settles stands in
+describe('src/module: channel close that never settles', () => {
+    function createClient() {
+        const channel = Object.assign(new EventEmitter(), {
+            publish: () => Promise.resolve(true),
+            waitForConnect: () => new Promise(() => {}),
+            close: () => new Promise(() => {}),
+        });
+
+        return {
+            channel,
+            client: new Client({ connection: { createChannel: () => channel } as any }),
+        };
+    }
+
+    it('should not hang publish', async () => {
+        const { client } = createClient();
+
+        await expect(client.publish('q', 'x')).resolves.toBe(true);
+    }, 2000);
+
+    it('should not hang a rejected consume', async () => {
+        const { channel, client } = createClient();
+
+        setImmediate(() => channel.emit('error', Object.assign(new Error('PRECONDITION_FAILED'), { code: 406 })));
+
+        await expect(client.consume('q', { $any: async () => {} })).rejects.toThrow(BrokerError);
+    }, 2000);
 });
