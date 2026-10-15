@@ -178,7 +178,7 @@ const client = new Client({
 | Option | Applies to | Default | Purpose |
 |---|---|---|---|
 | `requeueOnFailure` | consume | `false` | Requeue messages that are `nack`ed because a handler threw or none matched |
-| `prefetchCount` | consume | — | Maximum number of unacknowledged messages per consumer (`channel.prefetch`) |
+| `prefetchCount` | consume | none | Maximum number of unacknowledged messages per consumer (`channel.prefetch`) |
 | `noAck` | consume | `false` | amqplib option. When `true`, no `ack`/`nack` is sent at all |
 | `singleActiveConsumer` | both | `false` | Declare the default-exchange queue as single active consumer (see below) |
 
