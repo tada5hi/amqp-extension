@@ -75,6 +75,40 @@
 
 * allways close channel after publishing ([a9b300f](https://github.com/Tada5hi/amqp-extension/commit/a9b300f6ab64d176a656cf9fc485f31a36168a7f))
 
+## [5.0.0](https://github.com/tada5hi/amqp-extension/compare/v4.0.0...v5.0.0) (2026-10-15)
+
+
+### ⚠ BREAKING CHANGES
+
+* ExchangeType.MATCH ('match') is replaced by ExchangeType.HEADERS ('headers').
+* the default reconnect delay is now amqp-connection-manager's default (5 s) instead of 60 s
+* publish() and consume() now reject with AmqpExtensionError subclasses. Validation errors are TopologyError (was SyntaxError/Error), calls after close() and closed channels reject with ClientError, broker rejections with BrokerError (amqplib error as cause, reply code as replyCode), unserializable payloads with SerializationError, and publish timeouts with ClientError (PUBLISH_TIMEOUT).
+* the SIGINT auto-close is removed (call client.close() from your shutdown hook); buildConfig, Config, ConfigInput, isConsumeHandlers and isExchange are no longer exported; publish() and consume() reject on setup failures.
+* the package is ESM-only and requires Node.js >= 22.
+
+### Features
+
+* add error classes based on @ebec/core ([#469](https://github.com/tada5hi/amqp-extension/issues/469)) ([7a3ebd1](https://github.com/tada5hi/amqp-extension/commit/7a3ebd1fd26e6a7c201c573a112858baa0dbc943))
+* allow queue options for the named queue of the default exchange ([#455](https://github.com/tada5hi/amqp-extension/issues/455)) ([#460](https://github.com/tada5hi/amqp-extension/issues/460)) ([b9c02bf](https://github.com/tada5hi/amqp-extension/commit/b9c02bf079d6a847a0cbffc1042f3fc8f6461fe6))
+* close the client at the end of an `await using` scope ([#467](https://github.com/tada5hi/amqp-extension/issues/467)) ([1c574c4](https://github.com/tada5hi/amqp-extension/commit/1c574c43feacb15c9dd0fa45f6140e77cee9c34c))
+* configurable connection manager, cancellable consumers and onError ([#472](https://github.com/tada5hi/amqp-extension/issues/472)) ([b3e3d38](https://github.com/tada5hi/amqp-extension/commit/b3e3d38deef44cbec720de333e554bc582653b00))
+* more queue options and durable named queues on named exchanges ([#471](https://github.com/tada5hi/amqp-extension/issues/471)) ([f69e743](https://github.com/tada5hi/amqp-extension/commit/f69e74354420be4250e14c0c20869b337c5b1484))
+
+
+### Bug Fixes
+
+* replace the match exchange type with headers ([#475](https://github.com/tada5hi/amqp-extension/issues/475)) ([a68ed67](https://github.com/tada5hi/amqp-extension/commit/a68ed6711f66b6d032b09c483785326cc0497ae7))
+
+
+### Code Refactoring
+
+* deepen Client into topology planning, message settlement and setup-failure handling ([#464](https://github.com/tada5hi/amqp-extension/issues/464)) ([df2ada3](https://github.com/tada5hi/amqp-extension/commit/df2ada34ab05ac2e760f3ece0d646e36b4764a33))
+
+
+### Build System
+
+* modernize toolchain (tsdown, vitest, eslint v10, release-please) ([#456](https://github.com/tada5hi/amqp-extension/issues/456)) ([6f5effa](https://github.com/tada5hi/amqp-extension/commit/6f5effa0177700aedbd4bc00831d58775862d1c2))
+
 ## [3.1.1](https://github.com/Tada5hi/amqp-extension/compare/v3.1.0...v3.1.1) (2024-03-07)
 
 

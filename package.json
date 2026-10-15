@@ -1,6 +1,6 @@
 {
     "name": "amqp-extension",
-    "version": "4.0.0",
+    "version": "5.0.0",
     "type": "module",
     "description": "An amqp extension with functions and utility functions to consume and publish queue messages.",
     "author": {
