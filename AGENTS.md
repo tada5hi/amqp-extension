@@ -1,6 +1,6 @@
 <!-- NOTE: Keep this file and all corresponding files in the .agents directory updated as the project evolves. When making architectural changes, adding new patterns, or discovering important conventions, update the relevant sections. -->
 
-# amqp-extension — Agent Guide
+# amqp-extension: Agent Guide
 
 `amqp-extension` is a small, ESM-only TypeScript library (published to npm) on top of [amqplib](https://www.npmjs.com/package/amqplib) and [amqp-connection-manager](https://www.npmjs.com/package/amqp-connection-manager). It makes publishing and consuming RabbitMQ messages simpler. Its public API centers on one `Client` class with `publish()`, `consume()` and `of(exchange)`. It handles exchange and queue assertion, message serialization, type-based handler dispatch and ack/nack.
 

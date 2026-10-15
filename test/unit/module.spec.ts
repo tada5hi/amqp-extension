@@ -239,4 +239,17 @@ describe('src/module', () => {
 
         expect(other.connection.isConnected()).toBe(false);
     });
+
+    it('should close the connection when an `await using` scope ends', async () => {
+        let other: Client;
+
+        {
+            await using scoped = new Client({ connectionOptions: inject('MQ_CONNECTION_STRING') });
+            other = scoped;
+            await scoped.publish('dispose', 'fooBar');
+            expect(scoped.connection.isConnected()).toBe(true);
+        }
+
+        expect(other.connection.isConnected()).toBe(false);
+    });
 });

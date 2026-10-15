@@ -209,7 +209,7 @@ const client = new Client({
 | Option | Applies to | Default | Purpose |
 |---|---|---|---|
 | `requeueOnFailure` | consume | `false` | Requeue messages that are `nack`ed because a handler threw or none matched |
-| `prefetchCount` | consume | — | Maximum number of unacknowledged messages per consumer (`channel.prefetch`) |
+| `prefetchCount` | consume | none | Maximum number of unacknowledged messages per consumer (`channel.prefetch`) |
 | `noAck` | consume | `false` | amqplib option. When `true`, no `ack`/`nack` is sent at all |
 | `singleActiveConsumer` | both | `false` | Declare the default-exchange queue as single active consumer (see below) |
 | `timeout` | publish | none | Milliseconds to wait for the broker to take the message before rejecting with a `ClientError` (`PUBLISH_TIMEOUT`), e.g. while it is unreachable. Without it the call waits for the reconnect |
@@ -237,7 +237,7 @@ await client.publish('<queue>', { foo: 'bar' }, { singleActiveConsumer: true });
 
 | Export | Kind | Purpose |
 |---|---|---|
-| `Client` | class | `publish()`, `consume()`, `of()`, `close()`, plus the underlying `connection` |
+| `Client` | class | `publish()`, `consume()`, `of()`, `close()`, `[Symbol.asyncDispose]()`, plus the underlying `connection` |
 | `ClientContext` | type | Constructor input: `connection` / `connectionOptions`, `exchange`, `publishOptions`, `consumeOptions` |
 | `ExchangeType` | enum | `direct` (default exchange), `topic`, `fanout`, `match` |
 | `ConsumeHandlers` | type | Map from message `type` to handler, with the `$any` fallback key |
@@ -249,7 +249,7 @@ await client.publish('<queue>', { foo: 'bar' }, { singleActiveConsumer: true });
 
 ## Notes
 
-- **Close the client when you are done:** `await client.close()`. It closes the shared connection, so every `of()` sibling stops too. Nothing is closed automatically on `SIGINT`; hook it into your app's shutdown, e.g. `process.once('SIGINT', () => client.close())`.
+- **Close the client when you are done:** `await client.close()`. It closes the shared connection, so every `of()` sibling stops too. Nothing is closed automatically on `SIGINT`; hook it into your app's shutdown, e.g. `process.once('SIGTERM', () => client.close())`. For scoped code (scripts, jobs, tests) use `await using client = new Client(...)`: the client closes when the scope ends, also on a throw. Disposal runs at scope exit, not on a signal, and like `close()` it closes the shared connection, so use it on the root client rather than on `of()` siblings.
 - **Broker errors reject the call.** If the broker rejects the setup, e.g. `PRECONDITION_FAILED` for a queue re-declared with different `singleActiveConsumer` arguments or `ACCESS_REFUSED` for a queue that is already consumed exclusively, `publish()` / `consume()` reject with a `BrokerError` (the amqplib error is its `cause`). Only that channel closes; the connection stays up. A connection that merely drops during the call is not an error: the call completes after the reconnect (`publish` is bounded by its `timeout` option).
 - **Calls after `close()` reject** with a `ClientError` (`CLIENT_CLOSED`), also on `of()` siblings.
 - **A consumer cancelled by the broker stays cancelled**, e.g. when its queue is deleted. Call `consume()` again after re-creating the queue.
