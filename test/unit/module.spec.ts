@@ -14,7 +14,13 @@ import {
     it,
 } from 'vitest';
 import { connect } from 'amqp-connection-manager';
-import { Client } from '../../src';
+import {
+    BrokerError,
+    Client,
+    ClientError,
+    SerializationError,
+    TopologyError,
+} from '../../src';
 
 describe('src/module', () => {
     let client: Client;
@@ -108,19 +114,29 @@ describe('src/module', () => {
         await client.consume('mismatch', { singleActiveConsumer: true }, { $any: () => {} });
 
         await expect(client.publish('mismatch', 'fooBar')).rejects.toThrow(/PRECONDITION_FAILED/);
+        await expect(client.publish('mismatch', 'fooBar')).rejects.toMatchObject({
+            constructor: BrokerError,
+            code: 'BROKER_REJECTED',
+            replyCode: 406,
+        });
         await expect(client.consume('mismatch', { $any: () => {} })).rejects.toThrow(/PRECONDITION_FAILED/);
+        await expect(client.publish('mismatch', 'fooBar')).rejects.toMatchObject({
+            constructor: BrokerError,
+            code: 'BROKER_REJECTED',
+            replyCode: 406,
+        });
 
         // only the failing channel closed, the connection keeps working
         expect(client.connection.isConnected()).toBe(true);
         await expect(client.publish('foo', 'bar')).resolves.toBe(true);
     });
 
-    it('should reject invalid input with a SyntaxError', async () => {
+    it('should reject invalid input with a TopologyError', async () => {
         const nameless = client.of({ type: 'topic' });
 
-        await expect(nameless.consume('foo', { $any: () => {} })).rejects.toThrow(SyntaxError);
-        await expect(nameless.publish('foo', 'bar')).rejects.toThrow(SyntaxError);
-        await expect(client.of({ type: 'topic', name: 'test' }).publish('', 'bar')).rejects.toThrow(SyntaxError);
+        await expect(nameless.consume('foo', { $any: () => {} })).rejects.toThrow(TopologyError);
+        await expect(nameless.publish('foo', 'bar')).rejects.toThrow(TopologyError);
+        await expect(client.of({ type: 'topic', name: 'test' }).publish('', 'bar')).rejects.toThrow(TopologyError);
     });
 
     it('should recycle the connection on a channel error after setup', { timeout: 10_000 }, async () => {
@@ -144,7 +160,7 @@ describe('src/module', () => {
 
         await other.close();
 
-        await expect(published).rejects.toThrow('Channel closed');
+        await expect(published).rejects.toMatchObject({ constructor: ClientError, code: 'CHANNEL_CLOSED' });
     });
 
     it('should reject a refused consume without tearing down the connection', { timeout: 10_000 }, async () => {
@@ -152,6 +168,7 @@ describe('src/module', () => {
 
         // basic.consume (not a declaration) is refused: 403 ACCESS_REFUSED
         await expect(client.consume('exclusive', { $any: () => {} })).rejects.toThrow(/ACCESS_REFUSED/);
+        await expect(client.consume('exclusive', { $any: () => {} })).rejects.toMatchObject({ constructor: BrokerError, replyCode: 403 });
 
         expect(client.connection.isConnected()).toBe(true);
         await expect(client.publish('foo', 'bar')).resolves.toBe(true);
@@ -175,7 +192,7 @@ describe('src/module', () => {
     it('should honour the publish timeout while the broker is unreachable', { timeout: 10_000 }, async () => {
         const other = new Client({ connection: connect('amqp://root:start123@127.0.0.1:1', { reconnectTimeInSeconds: 0.1 }) });
 
-        await expect(other.publish('unreachable', 'fooBar', { timeout: 100 })).rejects.toThrow(/timeout/i);
+        await expect(other.publish('unreachable', 'fooBar', { timeout: 100 })).rejects.toMatchObject({ constructor: ClientError, code: 'PUBLISH_TIMEOUT' });
         await other.close();
     });
 
@@ -185,8 +202,23 @@ describe('src/module', () => {
 
         await other.close();
 
-        await expect(other.publish('closed', 'fooBar')).rejects.toThrow(/closed/);
-        await expect(sibling.consume('', { $any: () => {} })).rejects.toThrow(/closed/);
+        await expect(other.publish('closed', 'fooBar')).rejects.toMatchObject({ constructor: ClientError, code: 'CLIENT_CLOSED' });
+        await expect(sibling.consume('', { $any: () => {} })).rejects.toMatchObject({ constructor: ClientError, code: 'CLIENT_CLOSED' });
+    });
+
+    it('should reject an unserializable payload with a SerializationError', async () => {
+        const circular : Record<string, unknown> = {};
+        circular.self = circular;
+
+        await expect(client.publish('serialize', circular)).rejects.toMatchObject({ constructor: SerializationError, cause: expect.any(TypeError) });
+        await expect(client.publish('serialize', 1n)).rejects.toThrow(SerializationError);
+        await expect(client.publish('serialize', undefined)).rejects.toMatchObject({ code: 'SERIALIZATION_FAILED' });
+    });
+
+    it('should publish JSON falsy payloads', async () => {
+        await expect(client.publish('falsy', null)).resolves.toBe(true);
+        await expect(client.publish('falsy', 0)).resolves.toBe(true);
+        await expect(client.publish('falsy', false)).resolves.toBe(true);
     });
 
     it('should consume a fanout exchange with an empty binding key', async () => {

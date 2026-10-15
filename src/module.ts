@@ -10,6 +10,8 @@ import { connect } from 'amqp-connection-manager';
 import type { Channel } from 'amqplib';
 import type { ConsumeContext, ConsumeHandlers, ConsumeOptions } from './consume';
 import { handleMessage } from './consume/utils';
+import { ClientError, SerializationError } from './errors';
+import { toError } from './errors/utils';
 import type { Exchange } from './exchange';
 import { ExchangeType } from './exchange';
 import type { PublishContext, PublishOptions } from './publish';
@@ -54,7 +56,7 @@ function failure(channel: ChannelWrapper) : Promise<never> {
                 reject(err);
             }
         });
-        channel.once('close', () => reject(new Error('Channel closed')));
+        channel.once('close', () => reject(ClientError.channelClosed()));
     });
 
     // it may reject long after the call settled (e.g. close()), which is not an unhandled rejection
@@ -101,7 +103,7 @@ export class Client {
 
     protected assertOpen() : void {
         if (closed.has(this.connection)) {
-            throw new Error('The client is closed.');
+            throw ClientError.closed();
         }
     }
 
@@ -124,28 +126,32 @@ export class Client {
             } :
             _ctxOrFrom;
 
-        this.assertOpen();
-
-        const options = ctx.options ? mergeOptions(ctx.options, this.consumeOptions) : this.consumeOptions;
-        const topology = planTopology(this.exchange, ctx.from, options, true);
-
-        const channel = this.connection.createChannel({
-            setup: guard(async (ch: Channel) => {
-                const queue = await assertTopology(ch, topology) as string;
-
-                if (typeof options.prefetchCount === 'number') {
-                    await ch.prefetch(options.prefetchCount);
-                }
-
-                await ch.consume(queue, (message) => handleMessage(message, ch, ctx.handlers, options), options);
-            }),
-        });
-
         try {
-            await Promise.race([channel.waitForConnect(), failure(channel)]);
+            this.assertOpen();
+
+            const options = ctx.options ? mergeOptions(ctx.options, this.consumeOptions) : this.consumeOptions;
+            const topology = planTopology(this.exchange, ctx.from, options, true);
+
+            const channel = this.connection.createChannel({
+                setup: guard(async (ch: Channel) => {
+                    const queue = await assertTopology(ch, topology) as string;
+
+                    if (typeof options.prefetchCount === 'number') {
+                        await ch.prefetch(options.prefetchCount);
+                    }
+
+                    await ch.consume(queue, (message) => handleMessage(message, ch, ctx.handlers, options), options);
+                }),
+            });
+
+            try {
+                await Promise.race([channel.waitForConnect(), failure(channel)]);
+            } catch (e) {
+                await channel.close().catch(noop);
+                throw e;
+            }
         } catch (e) {
-            await channel.close().catch(noop);
-            throw e;
+            throw toError(e);
         }
     }
 
@@ -168,29 +174,47 @@ export class Client {
             } :
             _toOrCtx;
 
-        this.assertOpen();
-
-        const options = ctx.options ? mergeOptions(ctx.options, this.publishOptions) : this.publishOptions;
-        const topology = planTopology(this.exchange, ctx.to, options);
-
-        let content : Buffer;
-        if (Buffer.isBuffer(ctx.data)) {
-            content = ctx.data;
-        } else {
-            content = Buffer.from(typeof ctx.data === 'string' ? ctx.data : JSON.stringify(ctx.data), 'utf-8');
-        }
-
-        // ponytail: one channel per publish (self-healing, no shared state), reuse channels when throughput matters
-        const channel = this.connection.createChannel({ setup: guard((ch: Channel) => assertTopology(ch, topology)) });
-
-        // queued right away: sent once the setup ran, bounded by options.timeout, rejected by close()
-        const published = channel.publish(this.exchange.name || '', ctx.to, content, options);
-        published.catch(noop);
-
         try {
-            return await Promise.race([published, failure(channel)]);
-        } finally {
-            await channel.close().catch(noop);
+            this.assertOpen();
+
+            const options = ctx.options ? mergeOptions(ctx.options, this.publishOptions) : this.publishOptions;
+            const topology = planTopology(this.exchange, ctx.to, options);
+
+            let content : Buffer;
+            if (Buffer.isBuffer(ctx.data)) {
+                content = ctx.data;
+            } else if (typeof ctx.data === 'string') {
+                content = Buffer.from(ctx.data, 'utf-8');
+            } else {
+                let json : string | undefined;
+                try {
+                    json = JSON.stringify(ctx.data);
+                } catch (e) {
+                    throw SerializationError.payload(e);
+                }
+
+                // undefined, functions and symbols serialize to undefined
+                if (typeof json === 'undefined') {
+                    throw SerializationError.payload();
+                }
+
+                content = Buffer.from(json, 'utf-8');
+            }
+
+            // ponytail: one channel per publish (self-healing, no shared state), reuse channels when throughput matters
+            const channel = this.connection.createChannel({ setup: guard((ch: Channel) => assertTopology(ch, topology)) });
+
+            // queued right away: sent once the setup ran, bounded by options.timeout, rejected by close()
+            const published = channel.publish(this.exchange.name || '', ctx.to, content, options);
+            published.catch(noop);
+
+            try {
+                return await Promise.race([published, failure(channel)]);
+            } finally {
+                await channel.close().catch(noop);
+            }
+        } catch (e) {
+            throw toError(e);
         }
     }
 }
