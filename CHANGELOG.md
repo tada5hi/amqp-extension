@@ -75,6 +75,13 @@
 
 * allways close channel after publishing ([a9b300f](https://github.com/Tada5hi/amqp-extension/commit/a9b300f6ab64d176a656cf9fc485f31a36168a7f))
 
+## [5.1.0](https://github.com/tada5hi/amqp-extension/compare/v5.0.0...v5.1.0) (2026-10-15)
+
+
+### Features
+
+* **consume:** retry failed messages and guard redeliveries ([#477](https://github.com/tada5hi/amqp-extension/issues/477)) ([ceae2b6](https://github.com/tada5hi/amqp-extension/commit/ceae2b699f09f4f627d47402084655a1d282763c))
+
 ## [5.0.0](https://github.com/tada5hi/amqp-extension/compare/v4.0.0...v5.0.0) (2026-10-15)
 
 
