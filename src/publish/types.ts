@@ -8,7 +8,17 @@
 import type { Options } from 'amqplib';
 import type { QueueOptions } from '../queue';
 
-export type PublishOptions = Options.Publish & QueueOptions & {
+/**
+ * The AMQP properties of a published message (type, messageId, headers, persistent, …).
+ */
+type PublishProperties = Options.Publish;
+
+/**
+ * The properties a message is re-published with for a retry.
+ */
+export type RepublishOptions = PublishProperties;
+
+export type PublishOptions = PublishProperties & QueueOptions & {
     /**
      * Reject with ClientError (PUBLISH_TIMEOUT) when the message is not
      * handed to the broker within this many milliseconds, e.g. while the

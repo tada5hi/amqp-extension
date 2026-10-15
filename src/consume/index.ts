@@ -6,4 +6,5 @@
  */
 
 export * from './constants';
+export { ATTEMPT_HEADER, resolveAttempt } from './retry';
 export * from './types';

@@ -77,6 +77,8 @@ options = ctx.options ? mergeOptions(ctx.options, this.consumeOptions) : this.co
 
 `handleMessage(message, channel, handlers, options)` (`src/consume/utils.ts`, internal) owns the whole policy: `ConsumeHandlers` maps `message.properties.type` to a handler, `'$any'` (`ConsumeHandlerAnyKey`) is the fallback, the delivery is acked or nacked, and a failure is then reported to `options.onError`. It needs only `{ ack, nack }` from the channel, so it is tested broker-free. It never rejects: amqplib discards the consumer callback's promise, so a rejection would be unhandled.
 
+With `options.retry` (`src/consume/retry.ts`), a handler throw is re-published with `x-attempt` + 1 after an exponential backoff (`retryMessage`), then the original is acked; exhausted → ack + `onError(ATTEMPTS_EXHAUSTED)`; a failed re-publish → `nack(requeue: true)`. The re-publish goes through `Client.republish` (its own confirm channel, default exchange by queue name): never the consume channel, which may have been reset while the handler ran, and never `publish()`, whose queue assertion without the queue arguments would 406. `handleMessage` receives it, plus a per-`consume()` `Map<messageId, run>` that survives setup reruns, as a `HandleMessageContext`. The redelivery guard (only with `retry`, a `messageId` and without `noAck`): a redelivered copy of a tracked run is acked (with `ordered`, after the run settles); an untracked redelivery is a failed attempt, retried without running the handler. Without `retry` nothing changes: guarding would ack a copy whose original then cannot `nack` on its dead channel.
+
 ## Data Flow
 
 ```

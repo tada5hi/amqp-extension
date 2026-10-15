@@ -20,9 +20,11 @@ import {
     Client,
     ClientError,
     type ConsumeMessage,
+    ErrorCode,
     ExchangeType,
     SerializationError,
     TopologyError,
+    isClientError,
 } from '../../src';
 
 const sleep = (ms: number) => new Promise((resolve) => { setTimeout(resolve, ms); });
@@ -472,6 +474,89 @@ describe('src/module', () => {
         await expect(reported).resolves.toMatchObject({ message: 'boom' });
         await expect.poll(() => fallback).toHaveLength(1);
         expect(fallback[0]).toMatchObject({ constructor: ClientError, code: 'HANDLER_MISSING' });
+        await other.close();
+    });
+
+    it('should retry a failing handler with an x-attempt header, through a queue with arguments', async () => {
+        const attempts: unknown[] = [];
+        const { promise: done, resolve } = Promise.withResolvers<void>();
+        const options = { singleActiveConsumer: true, retry: { delay: 10 } };
+
+        const consumer = await client.consume('retry', options, {
+            $any: (message) => {
+                attempts.push(message.properties.headers?.['x-attempt']);
+                if (attempts.length < 3) {
+                    throw new Error('boom');
+                }
+                resolve();
+            },
+        });
+        await client.publish('retry', 'fooBar', { singleActiveConsumer: true, messageId: 'retry-1' });
+
+        await done;
+        expect(attempts).toEqual([undefined, 2, 3]);
+        await expect.poll(() => inspect(client, 'retry')).toMatchObject({ messageCount: 0 });
+        await consumer.cancel();
+    });
+
+    it('should drop a message once its retry attempts are exhausted', async () => {
+        let calls = 0;
+        const { promise: reported, resolve } = Promise.withResolvers<unknown>();
+
+        const consumer = await client.consume('retry-exhausted', {
+            retry: { delay: 10, maxAttempts: 2 },
+            onError: (error) => {
+                if (isClientError(error) && error.code === ErrorCode.ATTEMPTS_EXHAUSTED) {
+                    resolve(error);
+                }
+            },
+        }, { $any: () => { calls++; throw new Error('boom'); } });
+        await client.publish('retry-exhausted', 'fooBar');
+
+        await expect(reported).resolves.toMatchObject({ cause: { message: 'boom' } });
+        expect(calls).toBe(2);
+        await expect.poll(() => inspect(client, 'retry-exhausted')).toMatchObject({ messageCount: 0 });
+        await consumer.cancel();
+    });
+
+    it('should hold a redelivered copy of an ordered message still being handled after a reconnect', { timeout: 20_000 }, async () => {
+        const other = new Client({ connection: connect(inject('MQ_CONNECTION_STRING'), { reconnectTimeInSeconds: 0.1 }) });
+        const queueOptions = { singleActiveConsumer: true };
+        const seen: string[] = [];
+        const { promise: started, resolve: start } = Promise.withResolvers<void>();
+        const { promise: gate, resolve: open } = Promise.withResolvers<void>();
+
+        const consumer = await other.consume('redelivery-ordered', {
+            ...queueOptions,
+            prefetchCount: 1,
+            ordered: true,
+            retry: { delay: 10 },
+        }, {
+            $any: async (message) => {
+                seen.push(message.content.toString());
+                start();
+                await gate;
+            },
+        });
+        await other.publish('redelivery-ordered', 'm1', { ...queueOptions, messageId: 'm1' });
+        await started;
+
+        // the channel is reset while m1 is handled: the broker redelivers m1 to the re-registered consumer
+        const reconnected = new Promise((resolve) => { other.connection.once('connect', resolve); });
+        other.connection.reconnect();
+        await reconnected;
+        await other.publish('redelivery-ordered', 'm2', { ...queueOptions, messageId: 'm2' });
+
+        // the copy of m1 holds the prefetch slot, so m2 waits behind it
+        await expect.poll(() => inspect(other, 'redelivery-ordered')).toMatchObject({ messageCount: 1, consumerCount: 1 });
+        await sleep(200);
+        expect(seen).toEqual(['m1']);
+
+        open();
+        await expect.poll(() => seen).toEqual(['m1', 'm2']);
+        await consumer.cancel();
+        // the copy was acked, not left to be requeued
+        await expect(inspect(other, 'redelivery-ordered')).resolves.toMatchObject({ messageCount: 0 });
         await other.close();
     });
 

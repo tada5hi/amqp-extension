@@ -38,6 +38,16 @@ export class ClientError extends AmqpExtensionError {
         });
     }
 
+    static attemptsExhausted(type?: string, cause?: unknown) {
+        return new ClientError({
+            code: ErrorCode.ATTEMPTS_EXHAUSTED,
+            message: typeof type === 'string' ?
+                `The retry attempts for the message type "${type}" are exhausted.` :
+                'The retry attempts for a message without type are exhausted.',
+            cause,
+        });
+    }
+
     static timeout(cause?: unknown) {
         return new ClientError({
             code: ErrorCode.PUBLISH_TIMEOUT,

@@ -13,13 +13,14 @@ import type {
     ConsumeHandlers,
     ConsumeOptions,
     Consumer,
+    HandleMessageContext,
 } from './consume';
 import { handleMessage } from './consume/utils';
 import { ClientError, SerializationError } from './errors';
 import { toError } from './errors/utils';
 import type { Exchange } from './exchange';
 import { ExchangeType } from './exchange';
-import type { PublishContext, PublishOptions } from './publish';
+import type { PublishContext, PublishOptions, RepublishOptions } from './publish';
 import { assertTopology, planTopology } from './queue/utils';
 import type { ClientContext, Connection } from './types';
 import { mergeOptions } from './utils';
@@ -158,6 +159,8 @@ export class Client {
             // the latest setup run, awaited by cancel(): one in progress during a reconnect still registers a consumer
             let running : Promise<void> | undefined;
             const inFlight = new Set<Promise<void>>();
+            // with retry: the same runs by messageId, for the redelivery guard; kept across setup runs (reconnects)
+            const tracked = new Map<string, Promise<void>>();
 
             const channel = this.connection.createChannel({
                 setup: guard((ch: Channel) => {
@@ -172,8 +175,13 @@ export class Client {
                             await ch.prefetch(options.prefetchCount);
                         }
 
+                        const context : HandleMessageContext = {
+                            inFlight: tracked,
+                            republish: (content, props) => this.republish(queue, content, props),
+                        };
+
                         const { consumerTag } = await ch.consume(queue, (message) => {
-                            const handled = handleMessage(message, ch, ctx.handlers, options);
+                            const handled = handleMessage(message, ch, ctx.handlers, options, context);
                             inFlight.add(handled);
                             // handleMessage never rejects
                             handled.then(() => inFlight.delete(handled));
@@ -220,6 +228,34 @@ export class Client {
             return { cancel, [Symbol.asyncDispose]: cancel };
         } catch (e) {
             throw toError(e);
+        }
+    }
+
+    /**
+     * Re-publish a message for a retry, through the default exchange by queue name:
+     * that reaches the queue whatever exchange delivered it, without re-declaring it.
+     * Its own channel, not the consume channel: that one may have been reset while
+     * the handler ran, and this one waits for the broker's confirm.
+     *
+     * ponytail: a server-named queue is gone after a reconnect, so a retry of a
+     * message from before it is unroutable and dropped by the broker.
+     */
+    protected async republish(queue: string, content: Buffer, options: RepublishOptions) : Promise<void> {
+        this.assertOpen();
+
+        const channel = this.connection.createChannel();
+
+        // bounded, so a broker outage reaches the requeue nack instead of hanging cancel()
+        const published = channel.publish('', queue, content, { ...options, timeout: 30_000 });
+        published.catch(noop);
+
+        try {
+            // failure() also listens for the channel's errors: without a listener, a connection
+            // lost while the channel opens surfaces as an unhandled rejection
+            await Promise.race([published, failure(channel)]);
+        } finally {
+            // not awaited, see consume()
+            channel.close().catch(noop);
         }
     }
 
