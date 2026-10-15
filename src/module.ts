@@ -99,6 +99,14 @@ export class Client {
         await this.connection.close();
     }
 
+    /**
+     * `await using client = new Client(...)` closes the client when the scope ends.
+     * Like close(), it closes the shared connection, so use it on the root client, not on of() siblings.
+     */
+    async [Symbol.asyncDispose]() : Promise<void> {
+        await this.close();
+    }
+
     protected assertOpen() : void {
         if (closed.has(this.connection)) {
             throw new Error('The client is closed.');
