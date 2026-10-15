@@ -4,7 +4,7 @@
 
 A thin facade over `amqp-connection-manager`. One `Client` holds the following:
 
-- `connection`: either injected (`ctx.connection`) or created via `connect(ctx.connectionOptions, { reconnectTimeInSeconds: 60 })`. `client.close()` closes it, together with every channel and every `of()` sibling sharing it. There is no automatic close on `SIGINT`: the app owns the process.
+- `connection`: either injected (`ctx.connection`) or created via `connect(ctx.connectionOptions, { reconnectTimeInSeconds: 60 })`. `client.close()` closes it, together with every channel and every `of()` sibling sharing it. `Client` implements `Symbol.asyncDispose` (delegating to `close()`), so `await using client = new Client(...)` closes it at scope exit. There is no automatic close on `SIGINT`: the app owns the process.
 - `publishOptions` / `consumeOptions`: client-level defaults.
 - `exchange`: defaults to `{ type: 'direct', name: '' }`, which is the AMQP **default exchange**.
 
