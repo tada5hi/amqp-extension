@@ -205,7 +205,7 @@ await client.publish('<queue>', { foo: 'bar' }, { singleActiveConsumer: true });
 
 | Export | Kind | Purpose |
 |---|---|---|
-| `Client` | class | `publish()`, `consume()`, `of()`, plus the underlying `connection` |
+| `Client` | class | `publish()`, `consume()`, `of()`, `close()`, plus the underlying `connection` |
 | `ClientContext` | type | Constructor input: `connection` / `connectionOptions`, `exchange`, `publishOptions`, `consumeOptions` |
 | `ExchangeType` | enum | `direct` (default exchange), `topic`, `fanout`, `match` |
 | `ConsumeHandlers` | type | Map from message `type` to handler, with the `$any` fallback key |
@@ -215,7 +215,11 @@ await client.publish('<queue>', { foo: 'bar' }, { singleActiveConsumer: true });
 
 ## Notes
 
-- **Close the connection when you are done:** `await client.connection.close()`. A client that created its own connection also closes it on `SIGINT`.
+- **Close the client when you are done:** `await client.close()`. It closes the shared connection, so every `of()` sibling stops too. Nothing is closed automatically on `SIGINT`; hook it into your app's shutdown, e.g. `process.once('SIGINT', () => client.close())`.
+- **Broker errors reject the call.** If the broker rejects the setup, e.g. `PRECONDITION_FAILED` for a queue re-declared with different `singleActiveConsumer` arguments or `ACCESS_REFUSED` for a queue that is already consumed exclusively, `publish()` / `consume()` reject with that error. Only that channel closes; the connection stays up. A connection that merely drops during the call is not an error: the call completes after the reconnect (`publish` is bounded by its `timeout` option).
+- **Calls after `close()` reject** with `The client is closed.`, also on `of()` siblings.
+- **A consumer cancelled by the broker stays cancelled**, e.g. when its queue is deleted. Call `consume()` again after re-creating the queue.
+- **Invalid input rejects before anything touches the broker:** an empty queue name on the default exchange, a named exchange type without a `name`, or an empty routing key when publishing to a named exchange.
 - **Unconsumed fanout/topic messages are dropped.** Named exchanges bind an exclusive, auto-deleted queue per `consume` call, which lives only as long as that consumer.
 - **Handler errors are not rethrown.** Catch and log inside the handler if you need visibility.
 

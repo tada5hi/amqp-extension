@@ -7,28 +7,28 @@ Single npm package, ESM-only output (`"type": "module"`), Node `>=22`.
 ```
 amqp-extension/
 ├── src/
-│   ├── index.ts              # Public barrel: re-exports config, consume, exchange, module, publish, type
+│   ├── index.ts              # Public barrel: re-exports consume, exchange, module, publish, queue, type
 │   ├── module.ts             # Client class (publish / consume / of)
-│   ├── type.ts               # Connection, ConnectionOptions, ClientContext
+│   ├── types.ts              # Connection, ConnectionOptions, ClientContext
 │   ├── utils.ts              # mergeOptions (smob merger, left priority)
-│   ├── config/               # Legacy Config/ConfigInput types + buildConfig() (not used by Client)
 │   ├── consume/
 │   │   ├── constants.ts      # ConsumeHandlerAnyKey = '$any'
-│   │   ├── type.ts           # ConsumeOptions, ConsumeHandlers, ConsumeContext, ConsumeMessageHandler
-│   │   └── utils.ts          # isConsumeHandlers()
+│   │   ├── types.ts          # ConsumeOptions, ConsumeHandlers, ConsumeContext, ConsumeMessageHandler
+│   │   └── utils.ts          # handleMessage(): dispatch + ack/nack (internal, not re-exported)
 │   ├── exchange/
 │   │   ├── constants.ts      # ExchangeType enum (fanout, direct, topic, match)
-│   │   ├── type.ts           # Exchange, ExchangeOptions
-│   │   └── utils.ts          # isDefaultExchange(), isExchange()
+│   │   ├── types.ts          # Exchange, ExchangeOptions
+│   │   └── utils.ts          # isDefaultExchange()
 │   ├── publish/
-│   │   └── type.ts           # PublishOptions, PublishContext
+│   │   └── types.ts          # PublishOptions, PublishContext
 │   └── queue/
-│       ├── type.ts           # QueueOptions (singleActiveConsumer)
-│       └── utils.ts          # buildAssertQueueOptions() → amqplib Options.AssertQueue
+│       ├── types.ts          # QueueOptions (singleActiveConsumer), Topology (@internal)
+│       └── utils.ts          # planTopology() (pure), assertTopology() (internal)
 ├── test/
 │   ├── vitest.config.ts      # include glob, globalSetup, timeouts, coverage thresholds
 │   ├── utils/global-setup.ts # Starts rabbitmq:3-management container, provides MQ_CONNECTION_STRING
 │   ├── unit/module.spec.ts   # Client publish/consume tests against a live broker
+│   ├── unit/utils.spec.ts    # Broker-free tests: planTopology table, handleMessage settlement
 │   └── data/                 # Git-ignored scratch dir
 ├── dist/                     # Build output (git-ignored, published)
 ├── .github/
@@ -45,13 +45,12 @@ amqp-extension/
 | Module            | Purpose                                                                                               |
 |-------------------|-------------------------------------------------------------------------------------------------------|
 | `src/module.ts`   | `Client`: owns the connection, default publish/consume options and the bound exchange              |
-| `src/type.ts`     | `ClientContext` (constructor input), `Connection` (`ReturnType<typeof connect>`)                     |
-| `src/utils.ts`    | `mergeOptions`: deep merge where the call-site options win; keeps an `exchange` object whole (no deep merge) |
-| `src/consume/`    | Consume option and handler types, `$any` fallback key, handler-map type guard                       |
+| `src/types.ts`    | `ClientContext` (constructor input), `Connection` (`ReturnType<typeof connect>`)                     |
+| `src/utils.ts`    | `mergeOptions`: deep merge where the call-site options win                                          |
+| `src/consume/`    | Consume option and handler types, `$any` fallback key, `handleMessage` (dispatch + ack/nack policy) |
 | `src/publish/`    | Publish option/context types (`amqplib` `Options.Publish` & `QueueOptions`)                          |
-| `src/queue/`      | `QueueOptions` (flat on consume/publish options) for the default-exchange queue, mapped to `assertQueue` options/arguments |
+| `src/queue/`      | `QueueOptions` (flat on consume/publish options) plus topology planning/declaration for every exchange kind |
 | `src/exchange/`   | `ExchangeType` enum, `Exchange` shape, default-exchange detection                                  |
-| `src/config/`     | `buildConfig()` from the older API. Still exported but unused internally, kept for compatibility    |
 
 ## Key Dependencies
 
@@ -59,7 +58,7 @@ amqp-extension/
 |----------------------------|-----------------------------------------------------------------------|
 | `amqp-connection-manager`  | Reconnecting connection and channel wrapper (`connect`, `createChannel({ setup })`) |
 | `amqplib`                  | Underlying AMQP 0-9-1 client with bundled types; option types (`Options.*`) are re-used directly |
-| `smob`                     | `createMerger` for option merging, `isObject`                      |
+| `smob`                     | `createMerger` for option merging                                     |
 
 ## Package Exports
 
@@ -78,4 +77,4 @@ amqp-extension/
 }
 ```
 
-There is no `require` condition. Everything re-exported from `src/index.ts` is public API. `src/utils.ts` (`mergeOptions`) is **not** re-exported and stays internal.
+There is no `require` condition. Everything re-exported from `src/index.ts` is public API. `src/utils.ts` (`mergeOptions`), `src/consume/utils.ts` (`handleMessage`) and `src/queue/utils.ts` (`planTopology`, `assertTopology`) are **not** re-exported and stay internal. `Topology` lives in `src/queue/types.ts` but is `@internal`, so it is stripped from `dist/index.d.mts`.

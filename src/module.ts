@@ -5,24 +5,63 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
+import type { ChannelWrapper } from 'amqp-connection-manager';
 import { connect } from 'amqp-connection-manager';
-import type { Channel, ConsumeMessage } from 'amqplib';
-import process from 'node:process';
-import type { PublishContext, PublishOptions } from './publish';
-import type {
-    ClientContext,
-    Connection,
-
-} from './type';
+import type { Channel } from 'amqplib';
 import type { ConsumeContext, ConsumeHandlers, ConsumeOptions } from './consume';
-import { ConsumeHandlerAnyKey, isConsumeHandlers } from './consume';
+import { handleMessage } from './consume/utils';
 import type { Exchange } from './exchange';
-import {
-    ExchangeType,
-    isDefaultExchange,
-} from './exchange';
-import { buildAssertQueueOptions } from './queue/utils';
+import { ExchangeType } from './exchange';
+import type { PublishContext, PublishOptions } from './publish';
+import { assertTopology, planTopology } from './queue/utils';
+import type { ClientContext, Connection } from './types';
 import { mergeOptions } from './utils';
+
+// connections closed through Client.close(), shared by of() siblings
+const closed = new WeakSet<Connection>();
+
+const noop = () => undefined;
+
+/**
+ * Wrap a setup function, so a broker rejection during it (e.g. 403/406) closes only this channel:
+ * without an 'error' listener on the raw channel, amqplib rethrows it and tears down the whole connection.
+ * Only during setup: a channel error afterwards must still recycle the connection, because
+ * amqp-connection-manager never recovers a channel-only close, so consumers would silently die.
+ */
+function guard(setup: (channel: Channel) => Promise<unknown>) {
+    return async (channel: Channel) => {
+        channel.on('error', noop);
+
+        try {
+            await setup(channel);
+        } finally {
+            channel.off('error', noop);
+        }
+    };
+}
+
+/**
+ * Reject when the broker rejects a setup function (an error with an AMQP reply code)
+ * or the channel is closed (client.close()).
+ * Errors without a reply code (connection dropped mid-setup) are transient:
+ * the setup runs again on reconnect, so keep waiting.
+ */
+function failure(channel: ChannelWrapper) : Promise<never> {
+    const promise = new Promise<never>((_resolve, reject) => {
+        // ponytail: the listener stays, so setup errors after a reconnect are swallowed instead of crashing the process
+        channel.on('error', (err: Error & { code?: unknown }) => {
+            if (typeof err.code === 'number') {
+                reject(err);
+            }
+        });
+        channel.once('close', () => reject(new Error('Channel closed')));
+    });
+
+    // it may reject long after the call settled (e.g. close()), which is not an unhandled rejection
+    promise.catch(noop);
+
+    return promise;
+}
 
 export class Client {
     public readonly connection: Connection;
@@ -34,18 +73,7 @@ export class Client {
     protected exchange: Exchange;
 
     constructor(ctx: ClientContext) {
-        if (ctx.connection) {
-            this.connection = ctx.connection;
-        } else {
-            this.connection = connect(ctx.connectionOptions, { reconnectTimeInSeconds: 60 });
-
-            process.once('SIGINT', async () => {
-                if (this.connection) {
-                    await this.connection.close();
-                }
-            });
-        }
-
+        this.connection = ctx.connection ?? connect(ctx.connectionOptions, { reconnectTimeInSeconds: 60 });
         this.publishOptions = ctx.publishOptions || {};
         this.consumeOptions = ctx.consumeOptions || {};
         this.exchange = ctx.exchange || {
@@ -63,6 +91,20 @@ export class Client {
         });
     }
 
+    /**
+     * Close the (shared) connection and all its channels.
+     */
+    async close() : Promise<void> {
+        closed.add(this.connection);
+        await this.connection.close();
+    }
+
+    protected assertOpen() : void {
+        if (closed.has(this.connection)) {
+            throw new Error('The client is closed.');
+        }
+    }
+
     async consume(ctx: ConsumeContext) : Promise<void>;
 
     async consume(from: string, handlers: ConsumeHandlers): Promise<void>;
@@ -74,110 +116,37 @@ export class Client {
         _optionsOrHandlers?: ConsumeOptions | ConsumeHandlers,
         _handlers?: ConsumeHandlers,
     ) : Promise<void> {
-        let from : string;
-        let handlers: ConsumeHandlers;
-        let options: ConsumeOptions;
+        const ctx : ConsumeContext = typeof _ctxOrFrom === 'string' ?
+            {
+                from: _ctxOrFrom,
+                options: _handlers ? _optionsOrHandlers as ConsumeOptions : undefined,
+                handlers: _handlers || _optionsOrHandlers as ConsumeHandlers,
+            } :
+            _ctxOrFrom;
 
-        if (typeof _ctxOrFrom === 'string') {
-            from = _ctxOrFrom;
+        this.assertOpen();
 
-            if (isConsumeHandlers(_optionsOrHandlers)) {
-                handlers = _optionsOrHandlers;
-                options = this.consumeOptions;
-            } else {
-                handlers = _handlers as ConsumeHandlers;
-                options = mergeOptions(_optionsOrHandlers as ConsumeOptions, this.consumeOptions);
-            }
-        } else {
-            from = _ctxOrFrom.from;
-            handlers = _ctxOrFrom.handlers;
-
-            if (_ctxOrFrom.options) {
-                options = mergeOptions(_ctxOrFrom.options, this.consumeOptions);
-            } else {
-                options = this.consumeOptions;
-            }
-        }
-
-        const requeueOnFailure = options.requeueOnFailure ?? false;
-        const handleMessage = async (
-            message: ConsumeMessage | null,
-            ch: Channel,
-        ) => {
-            if (!message) {
-                return;
-            }
-
-            const handler = handlers[message.properties.type] ||
-                handlers[ConsumeHandlerAnyKey];
-
-            if (typeof handler === 'undefined') {
-                if (!options.noAck) {
-                    ch.nack(message, undefined, requeueOnFailure);
-                }
-                return;
-            }
-
-            try {
-                await handler(message, ch);
-
-                if (!options.noAck) {
-                    ch.ack(message);
-                }
-            } catch {
-                if (!options.noAck) {
-                    ch.nack(message, undefined, requeueOnFailure);
-                }
-            }
-        };
+        const options = ctx.options ? mergeOptions(ctx.options, this.consumeOptions) : this.consumeOptions;
+        const topology = planTopology(this.exchange, ctx.from, options, true);
 
         const channel = this.connection.createChannel({
-            setup: async (channel: Channel) => {
-                let queueName = from;
-                if (isDefaultExchange(this.exchange.type)) {
-                    if (queueName === '') {
-                        throw new Error('The queue name can not be empty if the default exchange is selected.');
-                    }
-
-                    await channel.assertQueue(queueName, buildAssertQueueOptions(options));
-                } else {
-                    await channel.assertExchange(
-                        this.exchange.name || '',
-                        this.exchange.type,
-                        this.exchange.options,
-                    );
-
-                    const assertionQueue = await channel.assertQueue(
-                        '',
-                        {
-                            durable: false,
-                            autoDelete: true,
-                            exclusive: true,
-                        },
-                    );
-
-                    await channel.bindQueue(
-                        assertionQueue.queue,
-                        this.exchange.name || '',
-                        from || '',
-                    );
-
-                    queueName = assertionQueue.queue;
-                }
+            setup: guard(async (ch: Channel) => {
+                const queue = await assertTopology(ch, topology) as string;
 
                 if (typeof options.prefetchCount === 'number') {
-                    await channel.prefetch(options.prefetchCount);
+                    await ch.prefetch(options.prefetchCount);
                 }
 
-                await channel.consume(
-                    queueName,
-                    (message) => handleMessage(message, channel),
-                    options,
-                );
-            },
+                await ch.consume(queue, (message) => handleMessage(message, ch, ctx.handlers, options), options);
+            }),
         });
 
-        return channel.waitForConnect();
+        try {
+            await Promise.race([channel.waitForConnect(), failure(channel)]);
+        } catch (e) {
+            await channel.close().catch(noop);
+            throw e;
+        }
     }
 
     async publish(ctx: PublishContext) : Promise<boolean>;
@@ -191,77 +160,37 @@ export class Client {
         _data?: any,
         _options?: PublishOptions,
     ) : Promise<boolean> {
-        let buffer : Buffer;
+        const ctx : PublishContext = typeof _toOrCtx === 'string' ?
+            {
+                to: _toOrCtx,
+                data: _data,
+                options: _options,
+            } :
+            _toOrCtx;
 
-        let to : string;
-        let data : any;
-        let options : PublishOptions;
-        if (typeof _toOrCtx === 'string') {
-            to = _toOrCtx;
-            data = _data;
+        this.assertOpen();
 
-            if (_options) {
-                options = mergeOptions(_options, this.publishOptions);
-            } else {
-                options = this.publishOptions;
-            }
+        const options = ctx.options ? mergeOptions(ctx.options, this.publishOptions) : this.publishOptions;
+        const topology = planTopology(this.exchange, ctx.to, options);
+
+        let content : Buffer;
+        if (Buffer.isBuffer(ctx.data)) {
+            content = ctx.data;
         } else {
-            to = _toOrCtx.to;
-            data = _toOrCtx.data;
-
-            if (_toOrCtx.options) {
-                options = mergeOptions(_toOrCtx.options, this.publishOptions);
-            } else {
-                options = this.publishOptions;
-            }
+            content = Buffer.from(typeof ctx.data === 'string' ? ctx.data : JSON.stringify(ctx.data), 'utf-8');
         }
 
-        if (Buffer.isBuffer(data)) {
-            buffer = data;
-        } else if (typeof data === 'string') {
-            buffer = Buffer.from(data, 'utf-8');
-        } else {
-            buffer = Buffer.from(JSON.stringify(data), 'utf-8');
+        // ponytail: one channel per publish (self-healing, no shared state), reuse channels when throughput matters
+        const channel = this.connection.createChannel({ setup: guard((ch: Channel) => assertTopology(ch, topology)) });
+
+        // queued right away: sent once the setup ran, bounded by options.timeout, rejected by close()
+        const published = channel.publish(this.exchange.name || '', ctx.to, content, options);
+        published.catch(noop);
+
+        try {
+            return await Promise.race([published, failure(channel)]);
+        } finally {
+            await channel.close().catch(noop);
         }
-
-        const { connection } = this;
-        const channel = connection.createChannel({
-            setup: async (channel: Channel) => {
-                if (isDefaultExchange(this.exchange.type)) {
-                    if (!to) {
-                        throw new Error('The queue name can not be empty if the default exchange is selected.');
-                    }
-
-                    await channel.assertQueue(to, buildAssertQueueOptions(options));
-
-                    return;
-                }
-
-                if (!this.exchange.name) {
-                    throw new SyntaxError('A non default exchange requires a name.');
-                }
-
-                await channel.assertExchange(
-                    this.exchange.name,
-                    this.exchange.type,
-                    this.exchange.options,
-                );
-            },
-        });
-
-        if (!to) {
-            throw new SyntaxError('The publish operation requires a destination.');
-        }
-
-        const published = await channel.publish(
-            this.exchange.name || '',
-            to,
-            buffer,
-            options,
-        );
-
-        await channel.close();
-
-        return published;
     }
 }

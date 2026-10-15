@@ -5,10 +5,9 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-export * from './config';
 export * from './consume';
 export * from './exchange';
 export * from './module';
 export * from './publish';
 export * from './queue';
-export * from './type';
+export * from './types';
