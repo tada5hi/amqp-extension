@@ -329,7 +329,7 @@ describe('src/consume/utils', () => {
             return {
                 published,
                 context: {
-                    inFlight: new Map<string, Promise<void>>(),
+                    inFlight: new Map<string, Promise<boolean>>(),
                     republish: async (_content: Buffer, options: Options.Publish) => {
                         calls.push('republish');
                         if (fail) {

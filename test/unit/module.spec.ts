@@ -88,7 +88,7 @@ describe('src/module', () => {
     });
 
     it('should deliver to a single active consumer in order', async () => {
-        const received: Record<string, string[]> = { a: [], b: [] };
+        const received: { a: string[], b: string[] } = { a: [], b: [] };
 
         await client.consume('sac', { singleActiveConsumer: true, prefetchCount: 1 }, {
             $any: (message) => {

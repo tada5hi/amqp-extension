@@ -18,6 +18,7 @@ npm run test           # vitest --run; starts a RabbitMQ container via testconta
 npm run test:coverage  # vitest with v8 coverage + 80% thresholds
 npm run lint           # eslint (flat config)
 npm run lint:fix
+npm run typecheck      # tsc over src/ and test/
 npx tsc --noEmit       # standalone type check (tsconfig has noEmit)
 ```
 
