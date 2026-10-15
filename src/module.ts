@@ -244,9 +244,15 @@ export class Client {
         this.assertOpen();
 
         const channel = this.connection.createChannel();
+
+        // bounded, so a broker outage reaches the requeue nack instead of hanging cancel()
+        const published = channel.publish('', queue, content, { ...options, timeout: 30_000 });
+        published.catch(noop);
+
         try {
-            // bounded, so a broker outage reaches the requeue nack instead of hanging cancel()
-            await channel.publish('', queue, content, { ...options, timeout: 30_000 });
+            // failure() also listens for the channel's errors: without a listener, a connection
+            // lost while the channel opens surfaces as an unhandled rejection
+            await Promise.race([published, failure(channel)]);
         } finally {
             // not awaited, see consume()
             channel.close().catch(noop);

@@ -208,7 +208,7 @@ When a handler throws, the message is re-published to the queue it came from (th
 - **A re-published message goes to the end of the queue**, so a retried message can be handled after a later one.
 - **A missing or invalid `x-attempt` header counts as attempt 1**, so a publisher that counts attempts elsewhere at worst gets more retries, never fewer.
 - A missing handler is not retried, and `retry` has no effect with `noAck`.
-- If the re-publish itself fails, or the broker does not take it within 30 s (e.g. it is unreachable), the original is `nack`ed with requeue and comes back as a redelivery.
+- If the re-publish itself fails, or the broker does not confirm it within 30 s (e.g. it is unreachable), the original is `nack`ed with requeue and comes back as a redelivery. A copy the broker took but confirmed late is then delivered as well (at-least-once).
 - `onError` is called after every failed attempt with the handler's error, and once with `ATTEMPTS_EXHAUSTED` when the message is dropped.
 - The message's `userId` is not copied: the broker rejects one that is not the re-publishing connection's user.
 
@@ -348,7 +348,7 @@ await client.publish('<queue>', { foo: 'bar' }, queueOptions);
 | `ConsumeOptions` / `PublishOptions` | type | amqplib options plus the extensions listed above |
 | `QueueOptions` | type | Queue arguments (`queueType`, `deliveryLimit`, `deadLetterExchange`, `deadLetterRoutingKey`, `messageTtl`, `maxLength`, `singleActiveConsumer`), part of both `ConsumeOptions` and `PublishOptions` |
 | `ConsumeRetryOptions` | type | `retry` consume option: `maxAttempts`, `delay` |
-| `ATTEMPT_HEADER`, `resolveAttempt`, `resolveRetryDelay`, `retryMessage` | constant / function | The `x-attempt` header name, reading it from message properties, the backoff, and the re-publish step |
+| `ATTEMPT_HEADER`, `resolveAttempt` | constant / function | The `x-attempt` header name, and reading the attempt from message properties |
 | `ConsumeMessage` | type | Re-export of amqplib's message type |
 | `AmqpExtensionError`, `TopologyError`, `ClientError`, `BrokerError`, `SerializationError` | class | Error tree, see [Errors](#errors) |
 | `ErrorCode` | enum | Stable error codes |
