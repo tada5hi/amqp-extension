@@ -6,6 +6,7 @@
  */
 
 export * from './consume';
+export * from './errors';
 export * from './exchange';
 export * from './module';
 export * from './publish';
