@@ -83,6 +83,7 @@ await client.consume('user.*', {
   - [Publish](#publish)
   - [Consume](#consume)
   - [Multiple exchanges](#multiple-exchanges)
+  - [Errors](#errors)
 - [Options](#options)
   - [Queue options](#queue-options)
 - [API](#api)
@@ -161,6 +162,35 @@ const notifications = client.of({ name: 'notifications', type: 'fanout' });
 await notifications.publish('deploy', { message: 'deploy finished' });
 ```
 
+### Errors
+
+`publish()` and `consume()` reject only with subclasses of `AmqpExtensionError` (built on [`@ebec/core`](https://www.npmjs.com/package/@ebec/core)). Check the category with `instanceof` and the specific failure with `code`:
+
+| Class | `code` |
+|---|---|
+| `TopologyError` | `QUEUE_NAME_EMPTY`, `EXCHANGE_NAME_MISSING`, `DESTINATION_MISSING` |
+| `ClientError` | `CLIENT_CLOSED`, `CHANNEL_CLOSED`, `PUBLISH_TIMEOUT` |
+| `BrokerError` | `BROKER_REJECTED`, with the AMQP reply code as `replyCode` |
+| `SerializationError` | `SERIALIZATION_FAILED` |
+
+```typescript
+import { BrokerError, ClientError, ErrorCode } from 'amqp-extension';
+
+try {
+    await client.publish('jobs', payload, { timeout: 5_000 });
+} catch (e) {
+    if (e instanceof BrokerError && e.replyCode === 406) {
+        // queue re-declared with different arguments
+    } else if (e instanceof ClientError && e.code === ErrorCode.PUBLISH_TIMEOUT) {
+        // broker unreachable
+    }
+}
+```
+
+The original amqplib / amqp-connection-manager error is available as `cause`.
+
+Earlier releases rejected invalid input with a plain `SyntaxError` or `Error`. Replace `instanceof SyntaxError` checks with `instanceof TopologyError`; the messages are unchanged.
+
 ## Options
 
 Client-wide defaults go into the constructor. Per-call options are deep-merged on top of them, and the per-call value wins.
@@ -212,14 +242,16 @@ await client.publish('<queue>', { foo: 'bar' }, { singleActiveConsumer: true });
 | `ConsumeOptions` / `PublishOptions` | type | amqplib options plus the extensions listed above |
 | `QueueOptions` | type | `{ singleActiveConsumer?: boolean }`, part of both `ConsumeOptions` and `PublishOptions` |
 | `ConsumeMessage` | type | Re-export of amqplib's message type |
+| `AmqpExtensionError`, `TopologyError`, `ClientError`, `BrokerError`, `SerializationError` | class | Error tree, see [Errors](#errors) |
+| `ErrorCode` | enum | Stable error codes |
 
 ## Notes
 
 - **Close the client when you are done:** `await client.close()`. It closes the shared connection, so every `of()` sibling stops too. Nothing is closed automatically on `SIGINT`; hook it into your app's shutdown, e.g. `process.once('SIGINT', () => client.close())`.
-- **Broker errors reject the call.** If the broker rejects the setup, e.g. `PRECONDITION_FAILED` for a queue re-declared with different `singleActiveConsumer` arguments or `ACCESS_REFUSED` for a queue that is already consumed exclusively, `publish()` / `consume()` reject with that error. Only that channel closes; the connection stays up. A connection that merely drops during the call is not an error: the call completes after the reconnect (`publish` is bounded by its `timeout` option).
-- **Calls after `close()` reject** with `The client is closed.`, also on `of()` siblings.
+- **Broker errors reject the call.** If the broker rejects the setup, e.g. `PRECONDITION_FAILED` for a queue re-declared with different `singleActiveConsumer` arguments or `ACCESS_REFUSED` for a queue that is already consumed exclusively, `publish()` / `consume()` reject with a `BrokerError` (the amqplib error is its `cause`). Only that channel closes; the connection stays up. A connection that merely drops during the call is not an error: the call completes after the reconnect (`publish` is bounded by its `timeout` option).
+- **Calls after `close()` reject** with a `ClientError` (`CLIENT_CLOSED`), also on `of()` siblings.
 - **A consumer cancelled by the broker stays cancelled**, e.g. when its queue is deleted. Call `consume()` again after re-creating the queue.
-- **Invalid input rejects before anything touches the broker:** an empty queue name on the default exchange, a named exchange type without a `name`, or an empty routing key when publishing to a named exchange.
+- **Invalid input rejects before anything touches the broker:** an empty queue name on the default exchange, a named exchange type without a `name`, or an empty routing key when publishing to a named exchange, with a `TopologyError`.
 - **Unconsumed fanout/topic messages are dropped.** Named exchanges bind an exclusive, auto-deleted queue per `consume` call, which lives only as long as that consumer.
 - **Handler errors are not rethrown.** Catch and log inside the handler if you need visibility.
 
