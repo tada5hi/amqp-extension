@@ -41,7 +41,7 @@ Every setup function is wrapped in `guard()` (`src/module.ts`), which attaches a
 
 ### 5. One channel per publish
 
-`publish` opens a channel and queues the message right away (`ChannelWrapper.publish`): it is sent only after the setup ran, the per-message `timeout` option bounds it during an outage, and `close()` rejects it. The publish is raced against `failure()`, and the channel is closed in `finally`. That is self-healing and needs no shared state. A long-lived publish channel is deliberately avoided: under amqp-connection-manager 5 one rejected declaration would disable it until the connection reconnects. `ponytail:` ceiling: throughput (and the per-connection channel limit, ~2047 concurrent publishes).
+`publish` opens a channel and queues the message right away (`ChannelWrapper.publish`): it is sent only after the setup ran, the per-message `timeout` option bounds it during an outage, and `close()` rejects it. The publish is raced against `failure()`, and the channel is closed in `finally`. That is self-healing and needs no shared state. A long-lived publish channel is deliberately avoided: under amqp-connection-manager 5 one rejected declaration would disable it until the connection reconnects. `ponytail:` ceiling: throughput (and the per-connection channel limit, ~2047 concurrent publishes). A shared publish channel was prototyped for #470 and dropped: one bad publish (e.g. an invalid `expiration`) closed it for every concurrent publish, declaring once per connection lost messages to a queue deleted behind the client, and its retry made delivery at-least-once.
 
 ## Design Patterns
 
