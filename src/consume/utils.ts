@@ -87,7 +87,8 @@ export async function handleMessage(
             return;
         }
 
-        // the consumer died mid-handling (crash, consumer timeout): a failed attempt.
+        // the consumer died mid-handling (crash, consumer timeout), or a channel reset lost the ack
+        // of a run that succeeded (that one runs again, at-least-once): a failed attempt.
         // Tracked through the backoff, so a reset during it does not retry it twice.
         // ponytail: in-process only; a redelivery landing on another consumer runs again.
         await track(context.inFlight, id, fail(message, channel, options, context));

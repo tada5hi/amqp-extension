@@ -208,14 +208,14 @@ When a handler throws, the message is re-published to the queue it came from (th
 - **A re-published message goes to the end of the queue**, so a retried message can be handled after a later one.
 - **A missing or invalid `x-attempt` header counts as attempt 1**, so a publisher that counts attempts elsewhere at worst gets more retries, never fewer.
 - A missing handler is not retried, and `retry` has no effect with `noAck`.
-- If the re-publish itself fails (e.g. the broker is unreachable), the original is `nack`ed with requeue and comes back as a redelivery.
+- If the re-publish itself fails, or the broker does not take it within 30 s (e.g. it is unreachable), the original is `nack`ed with requeue and comes back as a redelivery.
 - `onError` is called after every failed attempt with the handler's error, and once with `ATTEMPTS_EXHAUSTED` when the message is dropped.
 - The message's `userId` is not copied: the broker rejects one that is not the re-publishing connection's user.
 
 With `retry`, messages carrying a `messageId` are also guarded against redeliveries:
 
 - A redelivered copy of a message this consumer is **still handling** (its channel was reset, e.g. on a reconnect, while the handler ran) is not run again. It is acked right away, or, with `ordered: true`, only once the original has settled. Acking it early frees the prefetch slot, so on a `singleActiveConsumer` queue the next message would run next to the original.
-- A redelivered message this consumer is **not** handling means a consumer died while handling it (a crash, the broker's `consumer_timeout`). It counts as a failed attempt and is retried without running the handler first.
+- A redelivered message this consumer is **not** handling counts as a failed attempt and is retried without running the handler first. Usually a consumer died while handling it (a crash, the broker's `consumer_timeout`), but it can also be a message whose handler succeeded and whose ack was lost to a channel reset: that message runs again (at-least-once).
 
 The guard is per `consume()` call: a redelivery that lands on another consumer or process runs again. Messages without a `messageId` are not guarded.
 

@@ -245,7 +245,8 @@ export class Client {
 
         const channel = this.connection.createChannel();
         try {
-            await channel.publish('', queue, content, options);
+            // bounded, so a broker outage reaches the requeue nack instead of hanging cancel()
+            await channel.publish('', queue, content, { ...options, timeout: 30_000 });
         } finally {
             // not awaited, see consume()
             channel.close().catch(noop);
