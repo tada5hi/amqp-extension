@@ -13,7 +13,7 @@ amqp-extension/
 │   ├── utils.ts              # mergeOptions (smob merger, left priority)
 │   ├── consume/
 │   │   ├── constants.ts      # ConsumeHandlerAnyKey = '$any'
-│   │   ├── types.ts          # ConsumeOptions, ConsumeHandlers, ConsumeContext, ConsumeMessageHandler
+│   │   ├── types.ts          # ConsumeOptions, ConsumeHandlers, ConsumeContext, ConsumeMessageHandler, Consumer
 │   │   └── utils.ts          # handleMessage(): dispatch + ack/nack (internal, not re-exported)
 │   ├── errors/
 │   │   ├── base.ts           # AmqpExtensionError (extends @ebec/core BaseError)

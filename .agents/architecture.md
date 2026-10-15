@@ -35,6 +35,8 @@ Every setup function is wrapped in `guard()` (`src/module.ts`), which attaches a
 
 `consume` races `waitForConnect()` against `failure(wrapper)`. `failure()` rejects on a wrapper `'error'` **that carries an AMQP reply code** (a broker rejection: 403/404/405/406…) or on the wrapper's `'close'` (`ClientError.channelClosed()`; e.g. `client.close()` before setup, which otherwise never settles). Errors without a reply code (the connection dropped mid-setup: `Channel ended…`, `Connection closing`) are transient: amqp-connection-manager re-runs the setup on reconnect, so the call keeps waiting. A failed `consume` closes its channel. The listener stays attached, so setup errors after a later reconnect are swallowed instead of crashing the process (`ponytail:` ceiling: no `onError` hook yet).
 
+`consume` then resolves a `Consumer` (`src/consume/types.ts`). Its setup records the raw channel and consumer tag of every run, tracks the in-flight `handleMessage` promises and returns early once cancelled. `cancel()` is memoized and never rejects: it sets `cancelled` (no setup run after it, so a reconnect does not re-register the consumer), awaits a setup run still in progress (a reconnect that already passed the check registers a consumer), sends `basic.cancel` to the latest run's channel (errors swallowed, e.g. on a closed channel), awaits the in-flight handlers until none is left (so their messages are settled on the still-open channel) and closes the wrapper. `Symbol.asyncDispose` is `cancel`. `ponytail:` ceilings: a handler that never settles hangs `cancel()`, and so does a connection that drops between ChannelClose and CloseOk (amqplib).
+
 `client.close()` marks the shared connection as closed (a module-level `WeakSet`), so later `publish()`/`consume()` calls on it or any `of()` sibling reject with `ClientError.closed()` (`The client is closed.`) instead of hanging on a closed connection manager.
 
 ### 5. One channel per publish
@@ -48,9 +50,9 @@ Every setup function is wrapped in `guard()` (`src/module.ts`), which attaches a
 Each public operation accepts positional arguments or a single context object. Follow this pattern for new operations:
 
 ```typescript
-async consume(ctx: ConsumeContext): Promise<void>;
-async consume(from: string, handlers: ConsumeHandlers): Promise<void>;
-async consume(from: string, options: ConsumeOptions, handlers: ConsumeHandlers): Promise<void>;
+async consume(ctx: ConsumeContext): Promise<Consumer>;
+async consume(from: string, handlers: ConsumeHandlers): Promise<Consumer>;
+async consume(from: string, options: ConsumeOptions, handlers: ConsumeHandlers): Promise<Consumer>;
 
 async publish(ctx: PublishContext): Promise<boolean>;
 async publish(to: string, data: any): Promise<boolean>;
@@ -87,7 +89,7 @@ consume(from, options?, handlers)
   1. Merge options with client consumeOptions
   2. planTopology(…, consume = true) (validation, throws before any channel exists)
   3. Channel setup (guard): assertTopology → prefetch(prefetchCount) → channel.consume(queue, handleMessage, options)
-  4. race(waitForConnect(), failure()) resolves, or rejects (and closes the channel) on a broker rejection / close
+  4. race(waitForConnect(), failure()) resolves a Consumer, or rejects (and closes the channel) on a broker rejection / close
   5. handleMessage: pick the own handler for properties.type or $any → await → ack; on throw/no handler → nack
 ```
 

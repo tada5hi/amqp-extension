@@ -22,6 +22,18 @@ import {
     TopologyError,
 } from '../../src';
 
+const sleep = (ms: number) => new Promise((resolve) => { setTimeout(resolve, ms); });
+
+const inspect = async (client: Client, queue: string) => {
+    const channel = client.connection.createChannel();
+    try {
+        await channel.waitForConnect();
+        return await channel.checkQueue(queue);
+    } finally {
+        await channel.close();
+    }
+};
+
 describe('src/module', () => {
     let client: Client;
 
@@ -183,7 +195,7 @@ describe('src/module', () => {
         other.connection.reconnect();
 
         // a transport error is not a broker rejection: consume() resolves after the reconnect
-        await expect(consumed).resolves.toBeUndefined();
+        await expect(consumed).resolves.toMatchObject({ cancel: expect.any(Function) });
         await other.publish('drop-during-setup', 'fooBar');
         await expect(received).resolves.toEqual('fooBar');
         await other.close();
@@ -242,6 +254,127 @@ describe('src/module', () => {
 
         await custom.close();
         await fallback.close();
+    });
+
+    it('should not deliver to a cancelled consumer, also not after a reconnect', { timeout: 10_000 }, async () => {
+        const other = new Client({ connectionOptions: inject('MQ_CONNECTION_STRING'), connectionManagerOptions: { reconnectTimeInSeconds: 0.1 } });
+        let calls = 0;
+
+        const cancelled = await other.consume('cancel', { $any: () => { calls++; } });
+        await cancelled.cancel();
+
+        // cancelled while the connection goes away
+        const racing = await other.consume('cancel-racing', { $any: () => { calls++; } });
+        other.connection.reconnect();
+        await racing.cancel();
+
+        await expect(other.publish('cancel', 'fooBar')).resolves.toBe(true);
+        await expect(other.publish('cancel-racing', 'fooBar')).resolves.toBe(true);
+        // a consumer replayed on the reconnect would take the messages now
+        await sleep(200);
+
+        expect(calls).toBe(0);
+        await expect(inspect(other, 'cancel')).resolves.toMatchObject({ messageCount: 1, consumerCount: 0 });
+        await expect(inspect(other, 'cancel-racing')).resolves.toMatchObject({ messageCount: 1, consumerCount: 0 });
+        await other.close();
+    });
+
+    it('should not register a consumer cancelled while the connection comes back', { timeout: 10_000 }, async () => {
+        const other = new Client({ connectionOptions: inject('MQ_CONNECTION_STRING'), connectionManagerOptions: { reconnectTimeInSeconds: 0.1 } });
+        let calls = 0;
+
+        const consumer = await other.consume('cancel-connect', { $any: () => { calls++; } });
+        // the consumer's channel is opened on 'connect' (registered before), its setup runs after this cancel
+        const cancelled = new Promise((resolve) => {
+            other.connection.once('connect', () => { resolve(consumer.cancel()); });
+        });
+        other.connection.reconnect();
+        await cancelled;
+
+        await expect(other.publish('cancel-connect', 'fooBar')).resolves.toBe(true);
+        await sleep(200);
+
+        expect(calls).toBe(0);
+        await expect(inspect(other, 'cancel-connect')).resolves.toMatchObject({ messageCount: 1, consumerCount: 0 });
+        await other.close();
+    });
+
+    it('should stop deliveries while waiting for an in-flight handler on cancel', { timeout: 10_000 }, async () => {
+        const started = Promise.withResolvers<void>();
+        const gate = Promise.withResolvers<void>();
+        let deliveries = 0;
+
+        const consumer = await client.consume('cancel-stop', {
+            $any: async () => {
+                deliveries++;
+                started.resolve();
+                await gate.promise;
+            },
+        });
+        await client.publish('cancel-stop', 'foo');
+        await started.promise;
+
+        const cancelling = consumer.cancel();
+        await sleep(100);
+        // the consumer still waits for the first handler, but no longer receives
+        await client.publish('cancel-stop', 'bar');
+        await sleep(100);
+        gate.resolve();
+        await cancelling;
+        await sleep(100);
+
+        expect(deliveries).toBe(1);
+        await expect(inspect(client, 'cancel-stop')).resolves.toMatchObject({ messageCount: 1, consumerCount: 0 });
+    });
+
+    it('should let an in-flight handler finish and ack on cancel', { timeout: 10_000 }, async () => {
+        const started = Promise.withResolvers<void>();
+        const gate = Promise.withResolvers<void>();
+        let deliveries = 0;
+
+        const consumer = await client.consume('cancel-in-flight', {
+            $any: async () => {
+                deliveries++;
+                started.resolve();
+                await gate.promise;
+            },
+        });
+        await client.publish('cancel-in-flight', 'fooBar');
+        await started.promise;
+
+        let settled = false;
+        const cancelling = consumer.cancel().then(() => { settled = true; });
+        await sleep(100);
+        expect(settled).toBe(false);
+
+        gate.resolve();
+        await cancelling;
+
+        // acked once: nothing is left to redeliver
+        expect(deliveries).toBe(1);
+        await expect(inspect(client, 'cancel-in-flight')).resolves.toMatchObject({ messageCount: 0, consumerCount: 0 });
+    });
+
+    it('should cancel twice and after close()', { timeout: 10_000 }, async () => {
+        const other = new Client({ connectionOptions: inject('MQ_CONNECTION_STRING') });
+
+        const consumer = await other.consume('cancel-twice', { $any: () => {} });
+        await expect(Promise.all([consumer.cancel(), consumer.cancel()])).resolves.toEqual([undefined, undefined]);
+        await expect(consumer.cancel()).resolves.toBeUndefined();
+
+        const closing = await other.consume('cancel-closed', { $any: () => {} });
+        await other.close();
+        await expect(closing.cancel()).resolves.toBeUndefined();
+    });
+
+    it('should cancel a consumer when an `await using` scope ends', async () => {
+        {
+            await using consumer = await client.consume('cancel-dispose', { $any: () => {} });
+            expect(consumer).toBeDefined();
+            await expect(inspect(client, 'cancel-dispose')).resolves.toMatchObject({ consumerCount: 1 });
+        }
+
+        await expect(inspect(client, 'cancel-dispose')).resolves.toMatchObject({ consumerCount: 0 });
     });
 
     it('should close the connection', async () => {

@@ -157,6 +157,19 @@ await client.consume('user.*', {
 
 A handler that resolves acknowledges the message. A handler that throws, or a message with no matching handler, gets a `nack`.
 
+`consume()` resolves a `Consumer` once the subscription is in place. `cancel()` stops new deliveries, waits for the handlers still running (their messages are acked or nacked as usual), then closes the consumer's channel. It never rejects, and the consumer is not re-registered after a reconnect. `await using` cancels it when the scope ends:
+
+```typescript
+const consumer = await client.consume('user.*', { $any: async (message) => { /* ... */ } });
+// ...
+await consumer.cancel();
+
+{
+    await using scoped = await client.consume('jobs', { $any: async (message) => { /* ... */ } });
+    // ...
+} // cancelled here
+```
+
 Both methods also accept a single context object: `client.publish({ to, data, options })`, `client.consume({ from, options, handlers })`.
 
 ### Multiple exchanges
@@ -250,6 +263,7 @@ await client.publish('<queue>', { foo: 'bar' }, { singleActiveConsumer: true });
 | `ClientContext` | type | Constructor input: `connection` / `connectionOptions`, `connectionManagerOptions`, `exchange`, `publishOptions`, `consumeOptions` |
 | `ExchangeType` | enum | `direct` (default exchange), `topic`, `fanout`, `match` |
 | `ConsumeHandlers` | type | Map from message `type` to handler, with the `$any` fallback key |
+| `Consumer` | type | Resolved by `consume()`: `cancel()` and `[Symbol.asyncDispose]()` |
 | `ConsumeOptions` / `PublishOptions` | type | amqplib options plus the extensions listed above |
 | `QueueOptions` | type | `{ singleActiveConsumer?: boolean }`, part of both `ConsumeOptions` and `PublishOptions` |
 | `ConsumeMessage` | type | Re-export of amqplib's message type |

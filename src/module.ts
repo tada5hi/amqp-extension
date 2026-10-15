@@ -8,7 +8,12 @@
 import type { ChannelWrapper } from 'amqp-connection-manager';
 import { connect } from 'amqp-connection-manager';
 import type { Channel } from 'amqplib';
-import type { ConsumeContext, ConsumeHandlers, ConsumeOptions } from './consume';
+import type {
+    ConsumeContext,
+    ConsumeHandlers,
+    ConsumeOptions,
+    Consumer,
+} from './consume';
 import { handleMessage } from './consume/utils';
 import { ClientError, SerializationError } from './errors';
 import { toError } from './errors/utils';
@@ -115,17 +120,17 @@ export class Client {
         }
     }
 
-    async consume(ctx: ConsumeContext) : Promise<void>;
+    async consume(ctx: ConsumeContext) : Promise<Consumer>;
 
-    async consume(from: string, handlers: ConsumeHandlers): Promise<void>;
+    async consume(from: string, handlers: ConsumeHandlers): Promise<Consumer>;
 
-    async consume(from: string, options: ConsumeOptions, handlers: ConsumeHandlers): Promise<void>;
+    async consume(from: string, options: ConsumeOptions, handlers: ConsumeHandlers): Promise<Consumer>;
 
     async consume(
         _ctxOrFrom: ConsumeContext | string,
         _optionsOrHandlers?: ConsumeOptions | ConsumeHandlers,
         _handlers?: ConsumeHandlers,
-    ) : Promise<void> {
+    ) : Promise<Consumer> {
         const ctx : ConsumeContext = typeof _ctxOrFrom === 'string' ?
             {
                 from: _ctxOrFrom,
@@ -140,15 +145,36 @@ export class Client {
             const options = ctx.options ? mergeOptions(ctx.options, this.consumeOptions) : this.consumeOptions;
             const topology = planTopology(this.exchange, ctx.from, options, true);
 
+            let cancelled = false;
+            // the raw channel and consumer tag of the latest setup run
+            let current : { ch: Channel, consumerTag: string } | undefined;
+            // the latest setup run, awaited by cancel(): one in progress during a reconnect still registers a consumer
+            let running : Promise<void> | undefined;
+            const inFlight = new Set<Promise<void>>();
+
             const channel = this.connection.createChannel({
-                setup: guard(async (ch: Channel) => {
-                    const queue = await assertTopology(ch, topology) as string;
+                setup: guard((ch: Channel) => {
+                    running = (async () => {
+                        if (cancelled) {
+                            return;
+                        }
 
-                    if (typeof options.prefetchCount === 'number') {
-                        await ch.prefetch(options.prefetchCount);
-                    }
+                        const queue = await assertTopology(ch, topology) as string;
 
-                    await ch.consume(queue, (message) => handleMessage(message, ch, ctx.handlers, options), options);
+                        if (typeof options.prefetchCount === 'number') {
+                            await ch.prefetch(options.prefetchCount);
+                        }
+
+                        const { consumerTag } = await ch.consume(queue, (message) => {
+                            const handled = handleMessage(message, ch, ctx.handlers, options);
+                            inFlight.add(handled);
+                            // handleMessage never rejects
+                            handled.then(() => inFlight.delete(handled));
+                        }, options);
+                        current = { ch, consumerTag };
+                    })();
+
+                    return running;
                 }),
             });
 
@@ -158,6 +184,32 @@ export class Client {
                 await channel.close().catch(noop);
                 throw e;
             }
+
+            let cancelling : Promise<void> | undefined;
+            const cancel = () => {
+                cancelling ??= (async () => {
+                    // no setup run after this one: a reconnect does not re-register the consumer
+                    cancelled = true;
+                    await running?.catch(noop);
+
+                    // basic.cancel: no new deliveries, the channel stays open to settle the in-flight ones
+                    // (fails on a closed channel, e.g. after close() or during a reconnect)
+                    await current?.ch.cancel(current.consumerTag).catch(noop);
+
+                    // ponytail: a handler that never settles hangs cancel()
+                    // (a loop: deliveries that arrived before the cancel took effect add to the set)
+                    while (inFlight.size > 0) {
+                        await Promise.all(inFlight);
+                    }
+
+                    // ponytail: hangs if the connection drops between ChannelClose and CloseOk (amqplib)
+                    await channel.close().catch(noop);
+                })();
+
+                return cancelling;
+            };
+
+            return { cancel, [Symbol.asyncDispose]: cancel };
         } catch (e) {
             throw toError(e);
         }

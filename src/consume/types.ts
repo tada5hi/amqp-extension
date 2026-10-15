@@ -33,6 +33,18 @@ export type ConsumeOptions = Options.Consume & QueueOptions & {
     prefetchCount?: number
 };
 
+/**
+ * Resolved by consume(). `await using consumer = await client.consume(...)` cancels it when the scope ends.
+ */
+export type Consumer = {
+    /**
+     * Stop receiving messages, wait for the handlers still running (their messages are settled),
+     * then close the channel. Never rejects; calling it again returns the same promise.
+     */
+    cancel(): Promise<void>,
+    [Symbol.asyncDispose](): Promise<void>,
+};
+
 export type ConsumeContext = {
     from: string,
     options?: ConsumeOptions,
