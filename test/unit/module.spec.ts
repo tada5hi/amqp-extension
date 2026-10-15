@@ -20,9 +20,11 @@ import {
     Client,
     ClientError,
     type ConsumeMessage,
+    ErrorCode,
     ExchangeType,
     SerializationError,
     TopologyError,
+    isClientError,
 } from '../../src';
 
 const sleep = (ms: number) => new Promise((resolve) => { setTimeout(resolve, ms); });
@@ -473,6 +475,48 @@ describe('src/module', () => {
         await expect.poll(() => fallback).toHaveLength(1);
         expect(fallback[0]).toMatchObject({ constructor: ClientError, code: 'HANDLER_MISSING' });
         await other.close();
+    });
+
+    it('should retry a failing handler with an x-attempt header, through a queue with arguments', async () => {
+        const attempts: unknown[] = [];
+        const { promise: done, resolve } = Promise.withResolvers<void>();
+        const options = { singleActiveConsumer: true, retry: { delay: 10 } };
+
+        const consumer = await client.consume('retry', options, {
+            $any: (message) => {
+                attempts.push(message.properties.headers?.['x-attempt']);
+                if (attempts.length < 3) {
+                    throw new Error('boom');
+                }
+                resolve();
+            },
+        });
+        await client.publish('retry', 'fooBar', { singleActiveConsumer: true, messageId: 'retry-1' });
+
+        await done;
+        expect(attempts).toEqual([undefined, 2, 3]);
+        await expect.poll(() => inspect(client, 'retry')).toMatchObject({ messageCount: 0 });
+        await consumer.cancel();
+    });
+
+    it('should drop a message once its retry attempts are exhausted', async () => {
+        let calls = 0;
+        const { promise: reported, resolve } = Promise.withResolvers<unknown>();
+
+        const consumer = await client.consume('retry-exhausted', {
+            retry: { delay: 10, maxAttempts: 2 },
+            onError: (error) => {
+                if (isClientError(error) && error.code === ErrorCode.ATTEMPTS_EXHAUSTED) {
+                    resolve(error);
+                }
+            },
+        }, { $any: () => { calls++; throw new Error('boom'); } });
+        await client.publish('retry-exhausted', 'fooBar');
+
+        await expect(reported).resolves.toMatchObject({ cause: { message: 'boom' } });
+        expect(calls).toBe(2);
+        await expect.poll(() => inspect(client, 'retry-exhausted')).toMatchObject({ messageCount: 0 });
+        await consumer.cancel();
     });
 
     it('should close the connection', async () => {

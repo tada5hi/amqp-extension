@@ -5,7 +5,7 @@
  * view the LICENSE file that was distributed with this source code.
  */
 
-import type { ConsumeMessage } from 'amqplib';
+import type { ConsumeMessage, Options } from 'amqplib';
 import {
     describe,
     expect,
@@ -16,6 +16,7 @@ import {
     TopologyError,
     isClientError,
 } from '../../src';
+import { ATTEMPT_HEADER } from '../../src/consume/retry';
 import { handleMessage } from '../../src/consume/utils';
 import { planTopology } from '../../src/queue/utils';
 
@@ -309,6 +310,105 @@ describe('src/consume/utils', () => {
 
             await expect(handleMessage(createMessage('unknown'), channel, {}, { onError: () => { throw new Error('onError'); } })).resolves.toBeUndefined();
             await expect(handleMessage(createMessage('created'), channel, { created: fail }, { onError: () => Promise.reject(new Error('onError')) })).resolves.toBeUndefined();
+        });
+    });
+
+    describe('retry', () => {
+        const createRetryMessage = (attempt?: unknown) => ({
+            content: Buffer.from('{}'),
+            fields: { redelivered: false },
+            properties: {
+                type: 'created', 
+                messageId: 'm1', 
+                headers: attempt === undefined ? {} : { [ATTEMPT_HEADER]: attempt }, 
+            },
+        }) as ConsumeMessage;
+
+        const createContext = (calls: string[], fail?: Error) => {
+            const published: Options.Publish[] = [];
+            return {
+                published,
+                context: {
+                    inFlight: new Map<string, Promise<void>>(),
+                    republish: async (_content: Buffer, options: Options.Publish) => {
+                        calls.push('republish');
+                        if (fail) {
+                            throw fail;
+                        }
+                        published.push(options);
+                    },
+                },
+            };
+        };
+
+        const retry = { delay: 0 };
+
+        it('should re-publish with the next attempt, then ack, then report the handler error', async () => {
+            const channel = createChannel();
+            const { published, context } = createContext(channel.calls);
+            const errors: unknown[] = [];
+            const error = new Error('boom');
+
+            await handleMessage(createRetryMessage(2), channel, { created: () => { throw error; } }, {
+                retry,
+                onError: (e) => { channel.calls.push('onError'); errors.push(e); },
+            }, context);
+
+            expect(channel.calls).toEqual(['republish', 'ack', 'onError']);
+            expect(published[0]!.headers).toEqual({ [ATTEMPT_HEADER]: 3 });
+            expect(errors).toEqual([error]);
+        });
+
+        it.each([undefined, 'x', 0])('should count a missing or junk attempt header (%o) as attempt 1', async (attempt) => {
+            const channel = createChannel();
+            const { published, context } = createContext(channel.calls);
+
+            await handleMessage(createRetryMessage(attempt), channel, { created: () => { throw new Error('boom'); } }, { retry }, context);
+
+            expect(channel.calls).toEqual(['republish', 'ack']);
+            expect(published[0]!.headers).toEqual({ [ATTEMPT_HEADER]: 2 });
+        });
+
+        it('should ack and report ATTEMPTS_EXHAUSTED once the attempts are used up', async () => {
+            const channel = createChannel();
+            const { context } = createContext(channel.calls);
+            const errors: unknown[] = [];
+            const error = new Error('boom');
+
+            await handleMessage(createRetryMessage(2), channel, { created: () => { throw error; } }, {
+                retry: { ...retry, maxAttempts: 2 },
+                onError: (e) => { channel.calls.push('onError'); errors.push(e); },
+            }, context);
+
+            expect(channel.calls).toEqual(['ack', 'onError']);
+            expect(errors[0]).toMatchObject({ code: ErrorCode.ATTEMPTS_EXHAUSTED, cause: error });
+        });
+
+        it('should requeue when the re-publish fails, so the message comes back as a redelivery', async () => {
+            const channel = createChannel();
+            const { context } = createContext(channel.calls, new Error('broker gone'));
+
+            await handleMessage(createRetryMessage(), channel, { created: () => { throw new Error('boom'); } }, { retry }, context);
+
+            expect(channel.calls).toEqual(['republish', 'nack:true']);
+        });
+
+        it('should not retry a missing handler', async () => {
+            const channel = createChannel();
+            const { context } = createContext(channel.calls);
+
+            await handleMessage(createRetryMessage(), channel, {}, { retry }, context);
+
+            expect(channel.calls).toEqual(['nack:false']);
+        });
+
+        it('should not retry with noAck', async () => {
+            const channel = createChannel();
+            const { context } = createContext(channel.calls);
+
+            await handleMessage(createRetryMessage(), channel, { created: () => { throw new Error('boom'); } }, { retry, noAck: true }, context);
+
+            expect(channel.calls).toEqual([]);
         });
     });
 

@@ -7,12 +7,13 @@
 
 import type { ChannelWrapper } from 'amqp-connection-manager';
 import { connect } from 'amqp-connection-manager';
-import type { Channel } from 'amqplib';
+import type { Channel, Options } from 'amqplib';
 import type {
     ConsumeContext,
     ConsumeHandlers,
     ConsumeOptions,
     Consumer,
+    HandleMessageContext,
 } from './consume';
 import { handleMessage } from './consume/utils';
 import { ClientError, SerializationError } from './errors';
@@ -172,8 +173,10 @@ export class Client {
                             await ch.prefetch(options.prefetchCount);
                         }
 
+                        const context : HandleMessageContext = { republish: (content, props) => this.republish(queue, content, props) };
+
                         const { consumerTag } = await ch.consume(queue, (message) => {
-                            const handled = handleMessage(message, ch, ctx.handlers, options);
+                            const handled = handleMessage(message, ch, ctx.handlers, options, context);
                             inFlight.add(handled);
                             // handleMessage never rejects
                             handled.then(() => inFlight.delete(handled));
@@ -220,6 +223,27 @@ export class Client {
             return { cancel, [Symbol.asyncDispose]: cancel };
         } catch (e) {
             throw toError(e);
+        }
+    }
+
+    /**
+     * Re-publish a message for a retry, through the default exchange by queue name:
+     * that reaches the queue whatever exchange delivered it, without re-declaring it.
+     * Its own channel, not the consume channel: that one may have been reset while
+     * the handler ran, and this one waits for the broker's confirm.
+     *
+     * ponytail: a server-named queue is gone after a reconnect, so a retry of a
+     * message from before it is unroutable and dropped by the broker.
+     */
+    protected async republish(queue: string, content: Buffer, options: Options.Publish) : Promise<void> {
+        this.assertOpen();
+
+        const channel = this.connection.createChannel();
+        try {
+            await channel.publish('', queue, content, options);
+        } finally {
+            // not awaited, see consume()
+            channel.close().catch(noop);
         }
     }
 
