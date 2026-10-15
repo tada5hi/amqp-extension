@@ -75,7 +75,7 @@ export class Client {
     protected exchange: Exchange;
 
     constructor(ctx: ClientContext) {
-        this.connection = ctx.connection ?? connect(ctx.connectionOptions, { reconnectTimeInSeconds: 60 });
+        this.connection = ctx.connection ?? connect(ctx.connectionOptions, ctx.connectionManagerOptions);
         this.publishOptions = ctx.publishOptions || {};
         this.consumeOptions = ctx.consumeOptions || {};
         this.exchange = ctx.exchange || {

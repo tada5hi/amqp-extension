@@ -4,7 +4,7 @@
 
 A thin facade over `amqp-connection-manager`. One `Client` holds the following:
 
-- `connection`: either injected (`ctx.connection`) or created via `connect(ctx.connectionOptions, { reconnectTimeInSeconds: 60 })`. `client.close()` closes it, together with every channel and every `of()` sibling sharing it. `Client` implements `Symbol.asyncDispose` (delegating to `close()`), so `await using client = new Client(...)` closes it at scope exit. There is no automatic close on `SIGINT`: the app owns the process.
+- `connection`: either injected (`ctx.connection`) or created via `connect(ctx.connectionOptions, ctx.connectionManagerOptions)` (amqp-connection-manager's default reconnect delay: 5 s). `client.close()` closes it, together with every channel and every `of()` sibling sharing it. `Client` implements `Symbol.asyncDispose` (delegating to `close()`), so `await using client = new Client(...)` closes it at scope exit. There is no automatic close on `SIGINT`: the app owns the process.
 - `publishOptions` / `consumeOptions`: client-level defaults.
 - `exchange`: defaults to `{ type: 'direct', name: '' }`, which is the AMQP **default exchange**.
 
@@ -29,7 +29,7 @@ For every non-default type (`topic`, `fanout`, `match`), `consume(from, ...)` do
 
 `planTopology(exchange, key, options, consume?)` (`src/queue/utils.ts`) is pure. It returns a `Topology` (`{ exchange?, queue?, bind? }`) and throws on invalid input (an empty queue name on the default exchange, a nameless named exchange, an empty publish key on a named exchange) **before any channel is opened**. `assertTopology(channel, topology)` declares it and is only ever called from a channel `setup` callback, so it replays automatically after a reconnect.
 
-Every setup function is wrapped in `guard()` (`src/module.ts`), which attaches a no-op `'error'` listener to the raw amqplib channel **only while the setup runs** (declarations, `prefetch`, `basic.consume`). amqp-connection-manager doesn't, and without it amqplib rethrows a channel-level error (e.g. a 406 on a mismatched declaration, a 403 on an exclusive consumer) and tears down the **whole connection**, which then reconnects only after 60 s. After setup the listener is removed on purpose: amqp-connection-manager never recovers a channel-only close, so a runtime channel error (e.g. a handler acking a message itself, or the broker's `consumer_timeout`) must still recycle the connection, which re-runs the setup and re-registers the consumer.
+Every setup function is wrapped in `guard()` (`src/module.ts`), which attaches a no-op `'error'` listener to the raw amqplib channel **only while the setup runs** (declarations, `prefetch`, `basic.consume`). amqp-connection-manager doesn't, and without it amqplib rethrows a channel-level error (e.g. a 406 on a mismatched declaration, a 403 on an exclusive consumer) and tears down the **whole connection**, which then reconnects only after the reconnect delay. After setup the listener is removed on purpose: amqp-connection-manager never recovers a channel-only close, so a runtime channel error (e.g. a handler acking a message itself, or the broker's `consumer_timeout`) must still recycle the connection, which re-runs the setup and re-registers the consumer.
 
 ### 4. Broker rejections reject the call, transient errors don't
 
@@ -110,6 +110,7 @@ consume(from, options?, handlers)
 |---------------------|---------------------------------------------------------------|
 | `connection`        | Existing `amqp-connection-manager` connection (shared)          |
 | `connectionOptions` | `amqplib` `Options.Connect` or URL string, used when no `connection` is given |
+| `connectionManagerOptions` | amqp-connection-manager `connect()` options (e.g. `reconnectTimeInSeconds`), used when no `connection` is given |
 | `exchange`          | `{ type, name?, options? }`. Defaults to the default exchange   |
 | `publishOptions`    | Defaults merged into every `publish`                           |
 | `consumeOptions`    | Defaults merged into every `consume`. Extra fields: `requeueOnFailure`, `prefetchCount`, `singleActiveConsumer` |

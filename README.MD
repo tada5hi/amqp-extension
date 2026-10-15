@@ -117,6 +117,14 @@ const client = new Client({
 ```
 
 You can pass an existing [amqp-connection-manager](https://www.npmjs.com/package/amqp-connection-manager) connection as `connection` instead of `connectionOptions`.
+`connectionManagerOptions` is passed to amqp-connection-manager's `connect()`, e.g. to change the delay between reconnect attempts (default: 5 s):
+
+```typescript
+const client = new Client({
+    connectionOptions: 'amqp://<user>:<password>@<host>',
+    connectionManagerOptions: { reconnectTimeInSeconds: 1 },
+});
+```
 
 ### Publish
 
@@ -239,7 +247,7 @@ await client.publish('<queue>', { foo: 'bar' }, { singleActiveConsumer: true });
 | Export | Kind | Purpose |
 |---|---|---|
 | `Client` | class | `publish()`, `consume()`, `of()`, `close()`, `[Symbol.asyncDispose]()`, plus the underlying `connection` |
-| `ClientContext` | type | Constructor input: `connection` / `connectionOptions`, `exchange`, `publishOptions`, `consumeOptions` |
+| `ClientContext` | type | Constructor input: `connection` / `connectionOptions`, `connectionManagerOptions`, `exchange`, `publishOptions`, `consumeOptions` |
 | `ExchangeType` | enum | `direct` (default exchange), `topic`, `fanout`, `match` |
 | `ConsumeHandlers` | type | Map from message `type` to handler, with the `$any` fallback key |
 | `ConsumeOptions` / `PublishOptions` | type | amqplib options plus the extensions listed above |

@@ -154,7 +154,7 @@ describe('src/module', () => {
     });
 
     it('should reject a pending publish when the client is closed', { timeout: 10_000 }, async () => {
-        // never connects; a short retry delay keeps close() from waiting for the default 60 s
+        // never connects; a short retry delay keeps close() from waiting for the default 5 s
         const other = new Client({ connection: connect('amqp://root:start123@127.0.0.1:1', { reconnectTimeInSeconds: 0.1 }) });
         const published = other.publish('closed', 'fooBar');
 
@@ -229,6 +229,19 @@ describe('src/module', () => {
         await fanout.publish('any', 'fooBar');
 
         await expect(received).resolves.toEqual('fooBar');
+    });
+
+    it('should pass the connection manager options', async () => {
+        const reconnectTime = (other: Client) => (other.connection as unknown as { reconnectTimeInSeconds: number }).reconnectTimeInSeconds;
+        const custom = new Client({ connectionOptions: inject('MQ_CONNECTION_STRING'), connectionManagerOptions: { reconnectTimeInSeconds: 0.1 } });
+        const fallback = new Client({ connectionOptions: inject('MQ_CONNECTION_STRING') });
+
+        expect(reconnectTime(custom)).toBe(0.1);
+        // amqp-connection-manager's default: the heartbeat interval (5 s)
+        expect(reconnectTime(fallback)).toBe(5);
+
+        await custom.close();
+        await fallback.close();
     });
 
     it('should close the connection', async () => {
