@@ -329,7 +329,7 @@ describe('src/consume/utils', () => {
             return {
                 published,
                 context: {
-                    inFlight: new Map<string, Promise<void>>(),
+                    inFlight: new Map<string, Promise<boolean>>(),
                     republish: async (_content: Buffer, options: Options.Publish) => {
                         calls.push('republish');
                         if (fail) {
@@ -417,13 +417,13 @@ describe('src/consume/utils', () => {
                 const { promise: gate, resolve } = Promise.withResolvers<void>();
 
                 const running = handleMessage(message, channel, { created: () => { runs++; return gate; } }, { retry }, context);
-                // the channel was reset: the copy is acked right away, the original keeps running
-                await handleMessage(redeliver(message), channel, { created: () => { runs++; } }, { retry }, context);
-                expect(channel.calls).toEqual(['ack']);
+                // the channel was reset: the copy is not run, the original keeps running
+                const copy = handleMessage(redeliver(message), channel, { created: () => { runs++; } }, { retry }, context);
 
                 resolve();
-                await running;
+                await Promise.all([running, copy]);
                 expect(runs).toBe(1);
+                expect(channel.calls).toEqual(['ack', 'ack']);
 
                 // once settled, a redelivery means the consumer died mid-handling
                 await handleMessage(redeliver(message), channel, { created: () => { runs++; } }, { retry }, context);
@@ -431,14 +431,14 @@ describe('src/consume/utils', () => {
                 expect(published[0]!.headers).toEqual({ [ATTEMPT_HEADER]: 2 });
             });
 
-            it('should hold a redelivered copy of an ordered message until the original settles', async () => {
+            it('should hold a redelivered copy until the original settles', async () => {
                 const channel = createChannel();
                 const { context } = createContext(channel.calls);
                 const message = createRetryMessage();
                 const { promise: gate, resolve } = Promise.withResolvers<void>();
 
-                const running = handleMessage(message, channel, { created: () => gate }, { retry, ordered: true }, context);
-                const copy = handleMessage(redeliver(message), channel, { created: () => {} }, { retry, ordered: true }, context);
+                const running = handleMessage(message, channel, { created: () => gate }, { retry }, context);
+                const copy = handleMessage(redeliver(message), channel, { created: () => {} }, { retry }, context);
 
                 await new Promise((r) => { setTimeout(r, 10); });
                 expect(channel.calls).toEqual([]);
@@ -446,6 +446,21 @@ describe('src/consume/utils', () => {
                 resolve();
                 await Promise.all([running, copy]);
                 expect(channel.calls).toEqual(['ack', 'ack']);
+            });
+
+            it('should requeue a redelivered copy when the original could not be re-published', async () => {
+                const channel = createChannel();
+                const { context } = createContext(channel.calls, new Error('broker gone'));
+                const message = createRetryMessage();
+                const { promise: gate, resolve } = Promise.withResolvers<void>();
+
+                const running = handleMessage(message, channel, { created: async () => { await gate; throw new Error('boom'); } }, { retry }, context);
+                const copy = handleMessage(redeliver(message), channel, { created: () => {} }, { retry }, context);
+
+                resolve();
+                await Promise.all([running, copy]);
+                // the original's nack went to the reset channel: the copy is the only one left
+                expect(channel.calls).toEqual(['republish', 'nack:true', 'nack:true']);
             });
 
             it('should count a redelivery that is not in flight as a failed attempt', async () => {

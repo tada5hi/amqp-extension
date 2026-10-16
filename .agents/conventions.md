@@ -18,7 +18,7 @@ TypeScript is pinned to 6.x because `typescript-eslint` does not support TS 7 ye
 
 ## Workflow
 
-- After making changes, **always** run `npm run build`, `npm run lint` and `npx tsc --noEmit`. Run `npm run test` when Docker is available.
+- After making changes, **always** run `npm run build`, `npm run lint` and `npm run typecheck` (covers `src/` and `test/`). Run `npm run test` when Docker is available.
 - `npm run lint:fix` fixes most style issues. Check its output for trailing whitespace in reflowed lists.
 - When public API or behavior changes, update `README.MD` (Usage section).
 - Never hand-edit `CHANGELOG.md`, `.release-please-manifest.json` or the `version` in `package.json`. release-please owns them.
