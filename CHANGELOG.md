@@ -75,6 +75,13 @@
 
 * allways close channel after publishing ([a9b300f](https://github.com/Tada5hi/amqp-extension/commit/a9b300f6ab64d176a656cf9fc485f31a36168a7f))
 
+## [5.1.2](https://github.com/tada5hi/amqp-extension/compare/v5.1.1...v5.1.2) (2026-10-16)
+
+
+### Bug Fixes
+
+* treat a named direct exchange as a named exchange, not as the default exchange ([#483](https://github.com/tada5hi/amqp-extension/issues/483)) ([8bf807e](https://github.com/tada5hi/amqp-extension/commit/8bf807edff0dc7c7a5150f600364a3f1b7746901)), closes [#482](https://github.com/tada5hi/amqp-extension/issues/482)
+
 ## [5.1.1](https://github.com/tada5hi/amqp-extension/compare/v5.1.0...v5.1.1) (2026-10-16)
 
 
