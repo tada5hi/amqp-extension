@@ -118,6 +118,29 @@ describe('src/queue/utils', () => {
             });
     });
 
+    it('should plan a named direct exchange like any named exchange, not as the default exchange', () => {
+        const direct = { type: 'direct', name: 'commands' } as const;
+
+        expect(planTopology(direct, 'run', {}))
+            .toEqual({
+                exchange: {
+                    name: 'commands', 
+                    type: 'direct', 
+                    options: undefined, 
+                }, 
+            });
+        expect(planTopology(direct, 'run', { queue: 'workers' }, true))
+            .toEqual({
+                exchange: {
+                    name: 'commands', 
+                    type: 'direct', 
+                    options: undefined, 
+                },
+                queue: { name: 'workers', options: { durable: true } },
+                bind: 'run',
+            });
+    });
+
     it('should ignore queue on the default exchange and when publishing', () => {
         expect(planTopology({ type: 'direct' }, 'jobs', { queue: 'other' }, true))
             .toEqual({ queue: { name: 'jobs', options: { durable: true } } });

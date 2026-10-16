@@ -102,7 +102,7 @@ The package is ESM-only and requires Node.js `>=22`.
 
 ### Client
 
-A `Client` owns one connection and is bound to one exchange. Leave out `exchange` to use the **default exchange**, which routes each message straight to the queue named in the call.
+A `Client` owns one connection and is bound to one exchange. Leave out `exchange` (or pass a `direct` one without a `name`) to use the **default exchange**, which routes each message straight to the queue named in the call. A `direct` exchange with a `name` is a named exchange like `topic`, `fanout` and `headers`.
 
 ```typescript
 import { Client } from 'amqp-extension';
@@ -340,7 +340,7 @@ await client.publish('<queue>', { foo: 'bar' }, queueOptions);
 |---|---|---|
 | `Client` | class | `publish()`, `consume()`, `of()`, `close()`, `[Symbol.asyncDispose]()`, plus the underlying `connection` |
 | `ClientContext` | type | Constructor input: `connection` / `connectionOptions`, `connectionManagerOptions`, `exchange`, `publishOptions`, `consumeOptions` |
-| `ExchangeType` | enum | `direct` (default exchange), `topic`, `fanout`, `headers` |
+| `ExchangeType` | enum | `direct` (the default exchange without a `name`), `topic`, `fanout`, `headers` |
 | `ConsumeHandlers` | type | Map from message `type` to handler, with the `$any` fallback key |
 | `Consumer` | type | Resolved by `consume()`: `cancel()` and `[Symbol.asyncDispose]()` |
 | `ConsumeOptions` / `PublishOptions` | type | amqplib options plus the extensions listed above |

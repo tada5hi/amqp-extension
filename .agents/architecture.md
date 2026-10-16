@@ -12,13 +12,13 @@ A thin facade over `amqp-connection-manager`. One `Client` holds the following:
 
 ## Core Design Decisions
 
-### 1. `direct` type means the default exchange
+### 1. A nameless `direct` exchange means the default exchange
 
-`isDefaultExchange(type)` is true for `undefined` or `'direct'`. In that mode, `to`/`from` is a **queue name**: the queue is asserted durably (always `durable: true`) and messages are published to exchange `''` with the queue name as routing key. An empty queue name throws. Queue options (`QueueOptions`: `queueType`, `deliveryLimit`, `deadLetterExchange`, `deadLetterRoutingKey`, `messageTtl`, `maxLength`, `singleActiveConsumer`) are intersected flat into both `PublishOptions` and `ConsumeOptions`. `planTopology` maps them to `x-*` queue arguments through one key→argument map (`QueueArguments` in `src/queue/utils.ts`); `undefined` and `false` add no argument, and no options means no `arguments` key at all. Nothing is validated client-side: the broker answers a bad combination with a 406 (`BrokerError`). Publisher and consumer must pass the same values, because the broker rejects re-declaring a queue with different arguments. Named exchanges ignore them, except for the named `queue` of a consume (see section 2).
+`isDefaultExchange(type)` is true for `undefined` or `'direct'`; `planTopology` takes the default exchange only when the exchange also has no `name` (a named `direct` exchange is a named exchange, see section 2). In that mode, `to`/`from` is a **queue name**: the queue is asserted durably (always `durable: true`) and messages are published to exchange `''` with the queue name as routing key. An empty queue name throws. Queue options (`QueueOptions`: `queueType`, `deliveryLimit`, `deadLetterExchange`, `deadLetterRoutingKey`, `messageTtl`, `maxLength`, `singleActiveConsumer`) are intersected flat into both `PublishOptions` and `ConsumeOptions`. `planTopology` maps them to `x-*` queue arguments through one key→argument map (`QueueArguments` in `src/queue/utils.ts`); `undefined` and `false` add no argument, and no options means no `arguments` key at all. Nothing is validated client-side: the broker answers a bad combination with a 406 (`BrokerError`). Publisher and consumer must pass the same values, because the broker rejects re-declaring a queue with different arguments. Named exchanges ignore them, except for the named `queue` of a consume (see section 2).
 
 ### 2. Named exchanges use an exclusive, temporary queue per consumer, or a durable named one
 
-For every non-default type (`topic`, `fanout`, `headers`), `consume(from, ...)` does the following:
+For every named exchange (`topic`, `fanout`, `headers`, or `direct` with a `name`), `consume(from, ...)` does the following:
 1. Asserts the exchange (`exchange.name`, `exchange.type`, `exchange.options`).
 2. Asserts an anonymous queue `{ durable: false, autoDelete: true, exclusive: true }`, or, with the consume-only option `queue`, the queue of that name `{ durable: true, arguments }` with the `QueueOptions` arguments (the anonymous queue never gets them).
 3. Binds it with `from` as the routing key / binding pattern. Bindings are never removed, so another `from` on the same `queue` adds one.
