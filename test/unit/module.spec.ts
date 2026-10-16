@@ -304,6 +304,16 @@ describe('src/module', () => {
         await expect(client.publish('falsy', false)).resolves.toBe(true);
     });
 
+    it('should publish to and consume from a named direct exchange', async () => {
+        const direct = client.of({ type: 'direct', name: 'named-direct' });
+        const { promise: received, resolve } = Promise.withResolvers<string>();
+
+        await direct.consume('run', { queue: 'named-direct-workers' }, { $any: (message) => { resolve(message.content.toString()); } });
+        await expect(direct.publish('run', 'fooBar')).resolves.toBe(true);
+
+        await expect(received).resolves.toEqual('fooBar');
+    });
+
     it('should consume a fanout exchange with an empty binding key', async () => {
         const fanout = client.of({ type: 'fanout', name: 'broadcast' });
         const { promise: received, resolve } = Promise.withResolvers<string>();
@@ -315,9 +325,7 @@ describe('src/module', () => {
     });
 
     it('should declare every named exchange type', async () => {
-        const types = Object.values(ExchangeType).filter((type) => type !== ExchangeType.DIRECT);
-
-        for (const type of types) {
+        for (const type of Object.values(ExchangeType)) {
             await expect(client.of({ type, name: `exchange-type-${type}` }).consume('', { $any: () => {} })).resolves.toBeDefined();
         }
     });

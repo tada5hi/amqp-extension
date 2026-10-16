@@ -47,7 +47,8 @@ export function planTopology(
     options: QueueOptions & { queue?: string },
     consume?: boolean,
 ) : Topology {
-    if (isDefaultExchange(exchange.type)) {
+    // a named direct exchange is a named exchange like any other; only a nameless one is the default exchange
+    if (isDefaultExchange(exchange.type) && !exchange.name) {
         if (!key) {
             throw TopologyError.queueNameEmpty();
         }
