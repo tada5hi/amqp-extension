@@ -75,6 +75,13 @@
 
 * allways close channel after publishing ([a9b300f](https://github.com/Tada5hi/amqp-extension/commit/a9b300f6ab64d176a656cf9fc485f31a36168a7f))
 
+## [5.1.1](https://github.com/tada5hi/amqp-extension/compare/v5.1.0...v5.1.1) (2026-10-16)
+
+
+### Bug Fixes
+
+* **consume:** hold redelivered copies until the original settles, remove ordered ([#479](https://github.com/tada5hi/amqp-extension/issues/479)) ([b226986](https://github.com/tada5hi/amqp-extension/commit/b2269862e5521709ea391dc2798514634c250690))
+
 ## [5.1.0](https://github.com/tada5hi/amqp-extension/compare/v5.0.0...v5.1.0) (2026-10-15)
 
 
