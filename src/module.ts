@@ -144,10 +144,12 @@ export class Client {
             this.assertOpen();
 
             let options = this.consumeOptions;
+
             if (ctx.options) {
                 // smob clones through structuredClone, which throws on functions
                 const { onError, ...rest } = ctx.options;
                 const { onError: fallback, ...defaults } = this.consumeOptions;
+
                 options = { ...mergeOptions(rest, defaults), onError: onError ?? fallback };
             }
 
@@ -182,10 +184,12 @@ export class Client {
 
                         const { consumerTag } = await ch.consume(queue, (message) => {
                             const handled = handleMessage(message, ch, ctx.handlers, options, context);
+
                             inFlight.add(handled);
                             // handleMessage never rejects
                             handled.then(() => inFlight.delete(handled));
                         }, options);
+
                         current = { ch, consumerTag };
                     })();
 
@@ -198,6 +202,7 @@ export class Client {
             } catch (e) {
                 // not awaited: amqplib never settles the close when the connection drops before close-ok
                 channel.close().catch(noop);
+
                 throw e;
             }
 
@@ -247,6 +252,7 @@ export class Client {
 
         // bounded, so a broker outage reaches the requeue nack instead of hanging cancel()
         const published = channel.publish('', queue, content, { ...options, timeout: 30_000 });
+
         published.catch(noop);
 
         try {
@@ -285,12 +291,14 @@ export class Client {
             const topology = planTopology(this.exchange, ctx.to, options);
 
             let content : Buffer;
+
             if (Buffer.isBuffer(ctx.data)) {
                 content = ctx.data;
             } else if (typeof ctx.data === 'string') {
                 content = Buffer.from(ctx.data, 'utf-8');
             } else {
                 let json : string | undefined;
+
                 try {
                     json = JSON.stringify(ctx.data);
                 } catch (e) {
@@ -310,6 +318,7 @@ export class Client {
 
             // queued right away: sent once the setup ran, bounded by options.timeout, rejected by close()
             const published = channel.publish(this.exchange.name || '', ctx.to, content, options);
+
             published.catch(noop);
 
             try {

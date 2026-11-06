@@ -46,6 +46,7 @@ export async function retryMessage(
     options: ConsumeRetryOptions,
 ) : Promise<boolean> {
     const attempt = resolveAttempt(message.properties) + 1;
+
     if (attempt > (options.maxAttempts ?? 5)) {
         return false;
     }
@@ -58,6 +59,7 @@ export async function retryMessage(
         ...message.properties,
         headers: { ...message.properties.headers, [ATTEMPT_HEADER]: attempt },
     };
+
     // the broker rejects a user-id that is not the re-publishing connection's user
     delete properties.userId;
 

@@ -27,12 +27,16 @@ import {
     isClientError,
 } from '../../src';
 
-const sleep = (ms: number) => new Promise((resolve) => { setTimeout(resolve, ms); });
+const sleep = (ms: number) => new Promise((resolve) => {
+    setTimeout(resolve, ms);
+});
 
 const inspect = async (client: Client, queue: string) => {
     const channel = client.connection.createChannel();
+
     try {
         await channel.waitForConnect();
+
         return await channel.checkQueue(queue);
     } finally {
         await channel.close();
@@ -102,18 +106,23 @@ describe('src/module', () => {
         });
 
         const sent = ['1', '2', '3', '4', '5', '6'];
+
         await sent.reduce(
             (prev, item) => prev.then(() => client.publish('sac', item, { singleActiveConsumer: true })),
             Promise.resolve(true),
         );
 
         const deadline = Date.now() + 5000;
+
         while (received.a.length + received.b.length < sent.length && Date.now() < deadline) {
-            await new Promise((resolve) => { setTimeout(resolve, 20); });
+            await new Promise((resolve) => {
+                setTimeout(resolve, 20);
+            });
         }
 
         const active = received.a.length > 0 ? received.a : received.b;
         const passive = received.a.length > 0 ? received.b : received.a;
+
         expect(active).toEqual(sent);
         expect(passive).toEqual([]);
     });
@@ -121,7 +130,11 @@ describe('src/module', () => {
     it('should round-trip through a quorum queue', async () => {
         const { promise: received, resolve } = Promise.withResolvers<string>();
 
-        await client.consume('quorum', { queueType: 'quorum' }, { $any: (message) => { resolve(message.content.toString()); } });
+        await client.consume('quorum', { queueType: 'quorum' }, {
+            $any: (message) => {
+                resolve(message.content.toString());
+            },
+        });
         await client.publish('quorum', 'fooBar', { queueType: 'quorum' });
 
         await expect(received).resolves.toEqual('fooBar');
@@ -147,6 +160,7 @@ describe('src/module', () => {
         const url = inject('MQ_CONNECTION_STRING');
 
         const first = new Client({ connectionOptions: url, exchange });
+
         await first.consume('order.*', { queue: 'orders' }, { $any: () => {} });
         await first.close();
 
@@ -154,7 +168,11 @@ describe('src/module', () => {
 
         const { promise: received, resolve } = Promise.withResolvers<string>();
         await using second = new Client({ connectionOptions: url, exchange });
-        await second.consume('order.*', { queue: 'orders' }, { $any: (message) => { resolve(message.content.toString()); } });
+        await second.consume('order.*', { queue: 'orders' }, {
+            $any: (message) => {
+                resolve(message.content.toString());
+            },
+        });
 
         await expect(received).resolves.toEqual('fooBar');
     });
@@ -165,6 +183,7 @@ describe('src/module', () => {
         const { promise: done, resolve } = Promise.withResolvers<void>();
         const count = (key: string) => (message: ConsumeMessage) => {
             received[key]!.push(message.content.toString());
+
             if (received.a!.length + received.b!.length === 10) {
                 resolve();
             }
@@ -187,7 +206,11 @@ describe('src/module', () => {
     it('should use the handlers when empty options are passed', async () => {
         const { promise: received, resolve } = Promise.withResolvers<string>();
 
-        await client.consume('empty-options', {}, { $any: (message) => { resolve(message.content.toString()); } });
+        await client.consume('empty-options', {}, {
+            $any: (message) => {
+                resolve(message.content.toString());
+            },
+        });
         await client.publish('empty-options', 'fooBar');
 
         await expect(received).resolves.toEqual('fooBar');
@@ -224,10 +247,16 @@ describe('src/module', () => {
 
     it('should recycle the connection on a channel error after setup', { timeout: 10_000 }, async () => {
         const other = new Client({ connectionOptions: inject('MQ_CONNECTION_STRING') });
-        const disconnected = new Promise((resolve) => { other.connection.once('disconnect', resolve); });
+        const disconnected = new Promise((resolve) => {
+            other.connection.once('disconnect', resolve);
+        });
 
         // acking inside the handler makes the second ack fail: 406 unknown delivery tag
-        await other.consume('double-ack', { $any: (message, channel) => { channel.ack(message); } });
+        await other.consume('double-ack', {
+            $any: (message, channel) => {
+                channel.ack(message);
+            },
+        });
         // not awaited: the recycle can race the publish confirm, the publish then waits for the reconnect
         other.publish('double-ack', 'fooBar').catch(() => undefined);
 
@@ -259,10 +288,16 @@ describe('src/module', () => {
 
     it('should keep waiting when the connection drops during setup', { timeout: 10_000 }, async () => {
         const other = new Client({ connection: connect(inject('MQ_CONNECTION_STRING'), { reconnectTimeInSeconds: 0.1 }) });
+
         await other.publish('warmup', 'fooBar');
 
         const { promise: received, resolve } = Promise.withResolvers<string>();
-        const consumed = other.consume('drop-during-setup', { $any: (message) => { resolve(message.content.toString()); } });
+        const consumed = other.consume('drop-during-setup', {
+            $any: (message) => {
+                resolve(message.content.toString());
+            },
+        });
+
         other.connection.reconnect();
 
         // a transport error is not a broker rejection: consume() resolves after the reconnect
@@ -291,6 +326,7 @@ describe('src/module', () => {
 
     it('should reject an unserializable payload with a SerializationError', async () => {
         const circular : Record<string, unknown> = {};
+
         circular.self = circular;
 
         await expect(client.publish('serialize', circular)).rejects.toMatchObject({ constructor: SerializationError, cause: expect.any(TypeError) });
@@ -308,7 +344,11 @@ describe('src/module', () => {
         const direct = client.of({ type: 'direct', name: 'named-direct' });
         const { promise: received, resolve } = Promise.withResolvers<string>();
 
-        await direct.consume('run', { queue: 'named-direct-workers' }, { $any: (message) => { resolve(message.content.toString()); } });
+        await direct.consume('run', { queue: 'named-direct-workers' }, {
+            $any: (message) => {
+                resolve(message.content.toString());
+            },
+        });
         await expect(direct.publish('run', 'fooBar')).resolves.toBe(true);
 
         await expect(received).resolves.toEqual('fooBar');
@@ -318,7 +358,11 @@ describe('src/module', () => {
         const fanout = client.of({ type: 'fanout', name: 'broadcast' });
         const { promise: received, resolve } = Promise.withResolvers<string>();
 
-        await fanout.consume('', { $any: (message) => { resolve(message.content.toString()); } });
+        await fanout.consume('', {
+            $any: (message) => {
+                resolve(message.content.toString());
+            },
+        });
         await fanout.publish('any', 'fooBar');
 
         await expect(received).resolves.toEqual('fooBar');
@@ -347,11 +391,21 @@ describe('src/module', () => {
         const other = new Client({ connectionOptions: inject('MQ_CONNECTION_STRING'), connectionManagerOptions: { reconnectTimeInSeconds: 0.1 } });
         let calls = 0;
 
-        const cancelled = await other.consume('cancel', { $any: () => { calls++; } });
+        const cancelled = await other.consume('cancel', {
+            $any: () => {
+                calls++;
+            },
+        });
+
         await cancelled.cancel();
 
         // cancelled while the connection goes away
-        const racing = await other.consume('cancel-racing', { $any: () => { calls++; } });
+        const racing = await other.consume('cancel-racing', {
+            $any: () => {
+                calls++;
+            },
+        });
+
         other.connection.reconnect();
         await racing.cancel();
 
@@ -370,11 +424,18 @@ describe('src/module', () => {
         const other = new Client({ connectionOptions: inject('MQ_CONNECTION_STRING'), connectionManagerOptions: { reconnectTimeInSeconds: 0.1 } });
         let calls = 0;
 
-        const consumer = await other.consume('cancel-connect', { $any: () => { calls++; } });
+        const consumer = await other.consume('cancel-connect', {
+            $any: () => {
+                calls++;
+            },
+        });
         // the consumer's channel is opened on 'connect' (registered before), its setup runs after this cancel
         const cancelled = new Promise((resolve) => {
-            other.connection.once('connect', () => { resolve(consumer.cancel()); });
+            other.connection.once('connect', () => {
+                resolve(consumer.cancel());
+            });
         });
+
         other.connection.reconnect();
         await cancelled;
 
@@ -398,10 +459,12 @@ describe('src/module', () => {
                 await gate.promise;
             },
         });
+
         await client.publish('cancel-stop', 'foo');
         await started.promise;
 
         const cancelling = consumer.cancel();
+
         await sleep(100);
         // the consumer still waits for the first handler, but no longer receives
         await client.publish('cancel-stop', 'bar');
@@ -426,11 +489,15 @@ describe('src/module', () => {
                 await gate.promise;
             },
         });
+
         await client.publish('cancel-in-flight', 'fooBar');
         await started.promise;
 
         let settled = false;
-        const cancelling = consumer.cancel().then(() => { settled = true; });
+        const cancelling = consumer.cancel().then(() => {
+            settled = true;
+        });
+
         await sleep(100);
         expect(settled).toBe(false);
 
@@ -446,10 +513,12 @@ describe('src/module', () => {
         const other = new Client({ connectionOptions: inject('MQ_CONNECTION_STRING') });
 
         const consumer = await other.consume('cancel-twice', { $any: () => {} });
+
         await expect(Promise.all([consumer.cancel(), consumer.cancel()])).resolves.toEqual([undefined, undefined]);
         await expect(consumer.cancel()).resolves.toBeUndefined();
 
         const closing = await other.consume('cancel-closed', { $any: () => {} });
+
         await other.close();
         await expect(closing.cancel()).resolves.toBeUndefined();
     });
@@ -468,11 +537,24 @@ describe('src/module', () => {
         const fallback: unknown[] = [];
         const other = new Client({
             connectionOptions: inject('MQ_CONNECTION_STRING'),
-            consumeOptions: { onError: (error) => { fallback.push(error); } },
+            consumeOptions: {
+                onError: (error) => {
+                    fallback.push(error);
+                },
+            },
         });
         const { promise: reported, resolve } = Promise.withResolvers<unknown>();
 
-        await other.consume('on-error', { onError: (error) => { resolve(error); }, prefetchCount: 1 }, { $any: () => { throw new Error('boom'); } });
+        await other.consume('on-error', {
+            onError: (error) => {
+                resolve(error);
+            },
+            prefetchCount: 1,
+        }, {
+            $any: () => {
+                throw new Error('boom');
+            },
+        });
         // call-site options without onError: the client default reports
         await other.consume('on-error-default', { prefetchCount: 1 }, { created: () => {} });
 
@@ -493,12 +575,15 @@ describe('src/module', () => {
         const consumer = await client.consume('retry', options, {
             $any: (message) => {
                 attempts.push(message.properties.headers?.['x-attempt']);
+
                 if (attempts.length < 3) {
                     throw new Error('boom');
                 }
+
                 resolve();
             },
         });
+
         await client.publish('retry', 'fooBar', { singleActiveConsumer: true, messageId: 'retry-1' });
 
         await done;
@@ -518,7 +603,14 @@ describe('src/module', () => {
                     resolve(error);
                 }
             },
-        }, { $any: () => { calls++; throw new Error('boom'); } });
+        }, {
+            $any: () => {
+                calls++;
+
+                throw new Error('boom');
+            },
+        });
+
         await client.publish('retry-exhausted', 'fooBar');
 
         await expect(reported).resolves.toMatchObject({ cause: { message: 'boom' } });
@@ -545,11 +637,15 @@ describe('src/module', () => {
                 await gate;
             },
         });
+
         await other.publish('redelivery-ordered', 'm1', { ...queueOptions, messageId: 'm1' });
         await started;
 
         // the channel is reset while m1 is handled: the broker redelivers m1 to the re-registered consumer
-        const reconnected = new Promise((resolve) => { other.connection.once('connect', resolve); });
+        const reconnected = new Promise((resolve) => {
+            other.connection.once('connect', resolve);
+        });
+
         other.connection.reconnect();
         await reconnected;
         await other.publish('redelivery-ordered', 'm2', { ...queueOptions, messageId: 'm2' });
@@ -569,6 +665,7 @@ describe('src/module', () => {
 
     it('should close the connection', async () => {
         const other = new Client({ connectionOptions: inject('MQ_CONNECTION_STRING') });
+
         await other.publish('close', 'fooBar');
 
         await other.close();

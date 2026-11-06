@@ -26,8 +26,10 @@ function planQueueOptions(options: QueueOptions) : Options.AssertQueue {
     const queueOptions : Options.AssertQueue = { durable: true };
 
     const keys = Object.keys(QueueArguments) as (keyof QueueOptions)[];
+
     for (const key of keys) {
         const value = options[key];
+
         // false is left out like undefined, so a queue declared without the option stays equivalent
         if (typeof value !== 'undefined' && value !== false) {
             queueOptions.arguments = { ...queueOptions.arguments, [QueueArguments[key]]: value };
@@ -109,6 +111,7 @@ export async function assertTopology(channel: Channel, topology: Topology) : Pro
     }
 
     const { queue } = await channel.assertQueue(topology.queue.name, topology.queue.options);
+
     if (topology.exchange && typeof topology.bind === 'string') {
         await channel.bindQueue(queue, topology.exchange.name, topology.bind);
     }

@@ -9,6 +9,8 @@ import { GenericContainer } from 'testcontainers';
 import type { TestProject } from 'vitest/node';
 
 declare module 'vitest' {
+    // Vitest owns this augmentation name.
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     export interface ProvidedContext {
         MQ_CONNECTION_STRING: string
     }
