@@ -71,7 +71,7 @@ Call-site options are merged on top of client defaults:
 options = ctx.options ? mergeOptions(ctx.options, this.consumeOptions) : this.consumeOptions; // left (call-site) wins
 ```
 
-`mergeOptions` (smob) deep-merges, clones without mutating its inputs and dedupes arrays. It only runs when call options are passed: its clone turns a `Buffer` (e.g. in `headers`) into a plain `Uint8Array`, which amqplib no longer encodes as bytes. It clones through `structuredClone`, which throws on functions, so `consume` takes `onError` out of both sides first and re-attaches it afterwards (call-site value, else the client default).
+`mergeOptions` (smob) deep-merges, clones without mutating its inputs and dedupes arrays. It only runs when call options are passed: its clone turns a `Buffer` (e.g. in `headers`) into a plain `Uint8Array`, which amqplib does not encode as bytes. It clones through `structuredClone`, which throws on functions, so `consume` takes `onError` out of both sides first and re-attaches it afterwards (call-site value, else the client default).
 
 ### Handler dispatch and settlement
 

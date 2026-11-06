@@ -78,11 +78,13 @@ describe('src/errors', () => {
     describe('toError', () => {
         it('should pass a library error through unchanged', () => {
             const error = ClientError.closed();
+
             expect(toError(error)).toBe(error);
         });
 
         it('should wrap an error with a numeric reply code as BrokerError', () => {
             const cause = Object.assign(new Error('403 (ACCESS-REFUSED)'), { code: 403 });
+
             expect(toError(cause)).toMatchObject({
                 constructor: BrokerError,
                 replyCode: 403,
@@ -160,6 +162,7 @@ describe('src/errors', () => {
         it('should match an error from another copy of the library', () => {
             // a duplicate copy has other classes but the same Symbol.for markers
             const foreign = new Error('The client is closed.');
+
             markInstanceof(foreign, Symbol.for('amqp-extension/AmqpExtensionError'));
             markInstanceof(foreign, Symbol.for('amqp-extension/ClientError'));
 

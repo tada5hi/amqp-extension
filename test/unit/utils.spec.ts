@@ -124,17 +124,17 @@ describe('src/queue/utils', () => {
         expect(planTopology(direct, 'run', {}))
             .toEqual({
                 exchange: {
-                    name: 'commands', 
-                    type: 'direct', 
-                    options: undefined, 
-                }, 
+                    name: 'commands',
+                    type: 'direct',
+                    options: undefined,
+                },
             });
         expect(planTopology(direct, 'run', { queue: 'workers' }, true))
             .toEqual({
                 exchange: {
-                    name: 'commands', 
-                    type: 'direct', 
-                    options: undefined, 
+                    name: 'commands',
+                    type: 'direct',
+                    options: undefined,
                 },
                 queue: { name: 'workers', options: { durable: true } },
                 bind: 'run',
@@ -175,10 +175,15 @@ describe('src/consume/utils', () => {
 
     const createChannel = () => {
         const calls: string[] = [];
+
         return {
             calls,
-            ack: () => { calls.push('ack'); },
-            nack: (_message: unknown, _allUpTo?: boolean, requeue?: boolean) => { calls.push(`nack:${requeue}`); },
+            ack: () => {
+                calls.push('ack');
+            },
+            nack: (_message: unknown, _allUpTo?: boolean, requeue?: boolean) => {
+                calls.push(`nack:${requeue}`);
+            },
         };
     };
 
@@ -187,8 +192,12 @@ describe('src/consume/utils', () => {
         const seen: string[] = [];
 
         await handleMessage(createMessage('created'), channel, {
-            created: () => { seen.push('created'); },
-            $any: () => { seen.push('$any'); },
+            created: () => {
+                seen.push('created');
+            },
+            $any: () => {
+                seen.push('$any');
+            },
         }, {});
 
         expect(seen).toEqual(['created']);
@@ -200,6 +209,7 @@ describe('src/consume/utils', () => {
         const { promise: gate, resolve } = Promise.withResolvers<void>();
 
         const handled = handleMessage(createMessage('created'), channel, { created: () => gate }, {});
+
         await Promise.resolve();
         expect(channel.calls).toEqual([]);
 
@@ -212,7 +222,11 @@ describe('src/consume/utils', () => {
         const channel = createChannel();
         const seen: string[] = [];
 
-        await handleMessage(createMessage('unknown'), channel, { $any: () => { seen.push('$any'); } }, {});
+        await handleMessage(createMessage('unknown'), channel, {
+            $any: () => {
+                seen.push('$any');
+            },
+        }, {});
 
         expect(seen).toEqual(['$any']);
         expect(channel.calls).toEqual(['ack']);
@@ -223,7 +237,11 @@ describe('src/consume/utils', () => {
         const seen: string[] = [];
 
         // the type is set by the publisher, i.e. untrusted
-        await handleMessage(createMessage('toString'), channel, { $any: () => { seen.push('$any'); } }, {});
+        await handleMessage(createMessage('toString'), channel, {
+            $any: () => {
+                seen.push('$any');
+            },
+        }, {});
         await handleMessage(createMessage('constructor'), channel, {}, {});
 
         expect(seen).toEqual(['$any']);
@@ -241,7 +259,11 @@ describe('src/consume/utils', () => {
     it('should nack with requeueOnFailure when the handler throws', async () => {
         const channel = createChannel();
 
-        await handleMessage(createMessage('created'), channel, { created: () => { throw new Error('boom'); } }, { requeueOnFailure: true });
+        await handleMessage(createMessage('created'), channel, {
+            created: () => {
+                throw new Error('boom');
+            },
+        }, { requeueOnFailure: true });
 
         expect(channel.calls).toEqual(['nack:true']);
     });
@@ -249,7 +271,11 @@ describe('src/consume/utils', () => {
     it('should neither ack nor nack with noAck', async () => {
         const channel = createChannel();
 
-        await handleMessage(createMessage('created'), channel, { created: () => { throw new Error('boom'); } }, { noAck: true });
+        await handleMessage(createMessage('created'), channel, {
+            created: () => {
+                throw new Error('boom');
+            },
+        }, { noAck: true });
         await handleMessage(createMessage('created'), channel, {}, { noAck: true });
 
         expect(channel.calls).toEqual([]);
@@ -274,23 +300,27 @@ describe('src/consume/utils', () => {
             };
 
             return {
-                errors, 
-                messages, 
-                onError, 
+                errors,
+                messages,
+                onError,
             };
         };
 
         it('should report a handler error after the nack', async () => {
             const channel = createChannel();
             const {
-                errors, 
-                messages, 
-                onError, 
+                errors,
+                messages,
+                onError,
             } = createOnError(channel.calls);
             const error = new Error('boom');
             const message = createMessage('created');
 
-            await handleMessage(message, channel, { created: () => { throw error; } }, { onError });
+            await handleMessage(message, channel, {
+                created: () => {
+                    throw error;
+                },
+            }, { onError });
 
             expect(channel.calls).toEqual(['nack:false', 'onError']);
             expect(errors).toEqual([error]);
@@ -321,7 +351,11 @@ describe('src/consume/utils', () => {
             const channel = createChannel();
             const { onError } = createOnError(channel.calls);
 
-            await handleMessage(createMessage('created'), channel, { created: () => { throw new Error('boom'); } }, { noAck: true, onError });
+            await handleMessage(createMessage('created'), channel, {
+                created: () => {
+                    throw new Error('boom');
+                },
+            }, { noAck: true, onError });
             await handleMessage(createMessage('unknown'), channel, {}, { noAck: true, onError });
 
             expect(channel.calls).toEqual(['onError', 'onError']);
@@ -329,9 +363,15 @@ describe('src/consume/utils', () => {
 
         it('should not reject when onError throws or rejects', async () => {
             const channel = createChannel();
-            const fail = () => { throw new Error('boom'); };
+            const fail = () => {
+                throw new Error('boom');
+            };
 
-            await expect(handleMessage(createMessage('unknown'), channel, {}, { onError: () => { throw new Error('onError'); } })).resolves.toBeUndefined();
+            await expect(handleMessage(createMessage('unknown'), channel, {}, {
+                onError: () => {
+                    throw new Error('onError');
+                },
+            })).resolves.toBeUndefined();
             await expect(handleMessage(createMessage('created'), channel, { created: fail }, { onError: () => Promise.reject(new Error('onError')) })).resolves.toBeUndefined();
         });
     });
@@ -341,23 +381,26 @@ describe('src/consume/utils', () => {
             content: Buffer.from('{}'),
             fields: { redelivered: false },
             properties: {
-                type: 'created', 
-                messageId: 'm1', 
-                headers: attempt === undefined ? {} : { [ATTEMPT_HEADER]: attempt }, 
+                type: 'created',
+                messageId: 'm1',
+                headers: attempt === undefined ? {} : { [ATTEMPT_HEADER]: attempt },
             },
         }) as ConsumeMessage;
 
         const createContext = (calls: string[], fail?: Error) => {
             const published: Options.Publish[] = [];
+
             return {
                 published,
                 context: {
                     inFlight: new Map<string, Promise<boolean>>(),
                     republish: async (_content: Buffer, options: Options.Publish) => {
                         calls.push('republish');
+
                         if (fail) {
                             throw fail;
                         }
+
                         published.push(options);
                     },
                 },
@@ -372,9 +415,15 @@ describe('src/consume/utils', () => {
             const errors: unknown[] = [];
             const error = new Error('boom');
 
-            await handleMessage(createRetryMessage(2), channel, { created: () => { throw error; } }, {
+            await handleMessage(createRetryMessage(2), channel, {
+                created: () => {
+                    throw error;
+                },
+            }, {
                 retry,
-                onError: (e) => { channel.calls.push('onError'); errors.push(e); },
+                onError: (e) => {
+                    channel.calls.push('onError'); errors.push(e);
+                },
             }, context);
 
             expect(channel.calls).toEqual(['republish', 'ack', 'onError']);
@@ -386,7 +435,11 @@ describe('src/consume/utils', () => {
             const channel = createChannel();
             const { published, context } = createContext(channel.calls);
 
-            await handleMessage(createRetryMessage(attempt), channel, { created: () => { throw new Error('boom'); } }, { retry }, context);
+            await handleMessage(createRetryMessage(attempt), channel, {
+                created: () => {
+                    throw new Error('boom');
+                },
+            }, { retry }, context);
 
             expect(channel.calls).toEqual(['republish', 'ack']);
             expect(published[0]!.headers).toEqual({ [ATTEMPT_HEADER]: 2 });
@@ -398,9 +451,15 @@ describe('src/consume/utils', () => {
             const errors: unknown[] = [];
             const error = new Error('boom');
 
-            await handleMessage(createRetryMessage(2), channel, { created: () => { throw error; } }, {
+            await handleMessage(createRetryMessage(2), channel, {
+                created: () => {
+                    throw error;
+                },
+            }, {
                 retry: { ...retry, maxAttempts: 2 },
-                onError: (e) => { channel.calls.push('onError'); errors.push(e); },
+                onError: (e) => {
+                    channel.calls.push('onError'); errors.push(e);
+                },
             }, context);
 
             expect(channel.calls).toEqual(['ack', 'onError']);
@@ -411,7 +470,11 @@ describe('src/consume/utils', () => {
             const channel = createChannel();
             const { context } = createContext(channel.calls, new Error('broker gone'));
 
-            await handleMessage(createRetryMessage(), channel, { created: () => { throw new Error('boom'); } }, { retry }, context);
+            await handleMessage(createRetryMessage(), channel, {
+                created: () => {
+                    throw new Error('boom');
+                },
+            }, { retry }, context);
 
             expect(channel.calls).toEqual(['republish', 'nack:true']);
         });
@@ -439,9 +502,19 @@ describe('src/consume/utils', () => {
                 let runs = 0;
                 const { promise: gate, resolve } = Promise.withResolvers<void>();
 
-                const running = handleMessage(message, channel, { created: () => { runs++; return gate; } }, { retry }, context);
+                const running = handleMessage(message, channel, {
+                    created: () => {
+                        runs++;
+
+                        return gate;
+                    },
+                }, { retry }, context);
                 // the channel was reset: the copy is not run, the original keeps running
-                const copy = handleMessage(redeliver(message), channel, { created: () => { runs++; } }, { retry }, context);
+                const copy = handleMessage(redeliver(message), channel, {
+                    created: () => {
+                        runs++;
+                    },
+                }, { retry }, context);
 
                 resolve();
                 await Promise.all([running, copy]);
@@ -449,7 +522,11 @@ describe('src/consume/utils', () => {
                 expect(channel.calls).toEqual(['ack', 'ack']);
 
                 // once settled, a redelivery means the consumer died mid-handling
-                await handleMessage(redeliver(message), channel, { created: () => { runs++; } }, { retry }, context);
+                await handleMessage(redeliver(message), channel, {
+                    created: () => {
+                        runs++;
+                    },
+                }, { retry }, context);
                 expect(runs).toBe(1);
                 expect(published[0]!.headers).toEqual({ [ATTEMPT_HEADER]: 2 });
             });
@@ -463,7 +540,9 @@ describe('src/consume/utils', () => {
                 const running = handleMessage(message, channel, { created: () => gate }, { retry }, context);
                 const copy = handleMessage(redeliver(message), channel, { created: () => {} }, { retry }, context);
 
-                await new Promise((r) => { setTimeout(r, 10); });
+                await new Promise((r) => {
+                    setTimeout(r, 10);
+                });
                 expect(channel.calls).toEqual([]);
 
                 resolve();
@@ -477,7 +556,13 @@ describe('src/consume/utils', () => {
                 const message = createRetryMessage();
                 const { promise: gate, resolve } = Promise.withResolvers<void>();
 
-                const running = handleMessage(message, channel, { created: async () => { await gate; throw new Error('boom'); } }, { retry }, context);
+                const running = handleMessage(message, channel, {
+                    created: async () => {
+                        await gate;
+
+                        throw new Error('boom');
+                    },
+                }, { retry }, context);
                 const copy = handleMessage(redeliver(message), channel, { created: () => {} }, { retry }, context);
 
                 resolve();
@@ -491,7 +576,11 @@ describe('src/consume/utils', () => {
                 const { published, context } = createContext(channel.calls);
                 let runs = 0;
 
-                await handleMessage(redeliver(createRetryMessage(3)), channel, { created: () => { runs++; } }, { retry }, context);
+                await handleMessage(redeliver(createRetryMessage(3)), channel, {
+                    created: () => {
+                        runs++;
+                    },
+                }, { retry }, context);
 
                 expect(runs).toBe(0);
                 expect(channel.calls).toEqual(['republish', 'ack']);
@@ -505,7 +594,9 @@ describe('src/consume/utils', () => {
 
                 await handleMessage(redeliver(createRetryMessage(5)), channel, { created: () => {} }, {
                     retry,
-                    onError: (e) => { errors.push(e); },
+                    onError: (e) => {
+                        errors.push(e);
+                    },
                 }, context);
 
                 expect(channel.calls).toEqual(['ack']);
@@ -518,6 +609,7 @@ describe('src/consume/utils', () => {
                 const message = redeliver(createRetryMessage());
 
                 const retrying = handleMessage(message, channel, {}, { retry: { delay: 20 } }, context);
+
                 await handleMessage(message, channel, {}, { retry: { delay: 20 } }, context);
                 await retrying;
 
@@ -529,7 +621,11 @@ describe('src/consume/utils', () => {
                 const { context } = createContext(channel.calls);
                 let runs = 0;
 
-                await handleMessage(redeliver(createRetryMessage(), null), channel, { created: () => { runs++; } }, { retry }, context);
+                await handleMessage(redeliver(createRetryMessage(), null), channel, {
+                    created: () => {
+                        runs++;
+                    },
+                }, { retry }, context);
 
                 expect(runs).toBe(1);
                 expect(channel.calls).toEqual(['ack']);
@@ -540,7 +636,11 @@ describe('src/consume/utils', () => {
             const channel = createChannel();
             const { context } = createContext(channel.calls);
 
-            await handleMessage(createRetryMessage(), channel, { created: () => { throw new Error('boom'); } }, { retry, noAck: true }, context);
+            await handleMessage(createRetryMessage(), channel, {
+                created: () => {
+                    throw new Error('boom');
+                },
+            }, { retry, noAck: true }, context);
 
             expect(channel.calls).toEqual([]);
         });
@@ -548,8 +648,12 @@ describe('src/consume/utils', () => {
 
     it('should not reject when acking on a closed channel', async () => {
         const channel = {
-            ack: () => { throw new Error('Channel closed'); },
-            nack: () => { throw new Error('Channel closed'); },
+            ack: () => {
+                throw new Error('Channel closed');
+            },
+            nack: () => {
+                throw new Error('Channel closed');
+            },
         };
 
         await expect(handleMessage(createMessage('created'), channel, { created: () => {} }, {})).resolves.toBeUndefined();

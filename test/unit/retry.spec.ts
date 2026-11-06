@@ -7,11 +7,11 @@
 
 import type { ConsumeMessage, Options } from 'amqplib';
 import { describe, expect, it } from 'vitest';
-import { 
-    ATTEMPT_HEADER, 
-    resolveAttempt, 
-    resolveRetryDelay, 
-    retryMessage, 
+import {
+    ATTEMPT_HEADER,
+    resolveAttempt,
+    resolveRetryDelay,
+    retryMessage,
 } from '../../src/consume/retry';
 
 describe('src/consume/retry', () => {
@@ -48,9 +48,12 @@ describe('src/consume/retry', () => {
 
         const createPublisher = () => {
             const published: { content: Buffer, options: Options.Publish }[] = [];
+
             return {
                 published,
-                publish: async (content: Buffer, options: Options.Publish) => { published.push({ content, options }); },
+                publish: async (content: Buffer, options: Options.Publish) => {
+                    published.push({ content, options });
+                },
             };
         };
 
@@ -103,7 +106,10 @@ describe('src/consume/retry', () => {
             const { published, publish } = createPublisher();
 
             const retried = retryMessage(createMessage({}), publish, { delay: 20 });
-            await new Promise((resolve) => { setTimeout(resolve, 5); });
+
+            await new Promise((resolve) => {
+                setTimeout(resolve, 5);
+            });
             expect(published).toEqual([]);
 
             await retried;
