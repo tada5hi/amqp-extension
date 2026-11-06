@@ -57,8 +57,8 @@ function guard(setup: (channel: Channel) => Promise<unknown>) {
 function failure(channel: ChannelWrapper) : Promise<never> {
     const promise = new Promise<never>((_resolve, reject) => {
         // ponytail: the listener stays, so setup errors after a reconnect are swallowed instead of crashing the process
-        channel.on('error', (err: Error & { code?: unknown }) => {
-            if (typeof err.code === 'number') {
+        channel.on('error', (err) => {
+            if (typeof err === 'object' && err !== null && 'code' in err && typeof err.code === 'number') {
                 reject(err);
             }
         });
