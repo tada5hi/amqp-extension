@@ -709,6 +709,16 @@ describe('src/module: channel close that never settles', () => {
         await expect(client.publish('q', 'x')).resolves.toBe(true);
     }, 2000);
 
+    it.each([undefined, null, 'connection lost', new Error('Connection closing'), { code: 'ECONNRESET' }])('should keep waiting after a transient error (%s)', async (error) => {
+        const { channel, client } = createClient();
+        const consumed = client.consume('q', { $any: async () => {} });
+
+        expect(() => channel.emit('error', error)).not.toThrow();
+        channel.emit('close');
+
+        await expect(consumed).rejects.toThrow(ClientError);
+    });
+
     it('should not hang a rejected consume', async () => {
         const { channel, client } = createClient();
 
